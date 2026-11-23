@@ -10,7 +10,7 @@
 using namespace glm;
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
-
+int cameraMode = 1;
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
 
@@ -50,34 +50,38 @@ int main()
 
     Shader sceneShader("./shaders/vs/scene.vs", "./shaders/fs/scene.fs");
 
-       std::vector<GLuint> cardTextures = loadTextures({
-        "./textures/crate.jpg",
-        "./textures/crate2.jpg",
-        "./textures/ball.jpg",
-        "./textures/white.jpg",
-        "./textures/alrihla.jpg"});
+    std::vector<GLuint> cardTextures = loadTextures({"./textures/crate.jpg",
+                                                     "./textures/crate2.jpg",
+                                                     "./textures/ball.jpg",
+                                                     "./textures/white.jpg",
+                                                     "./textures/alrihla.jpg"});
 
     vec3 deckPosition = vec3(4.0f, 0.0f, 2.75f);
 
     std::vector<Card> deck;
     for (int i = 0; i < 5; i++)
     {
-              deck.push_back(Card(i, cardTextures[i], deckPosition, 0.01f * i));   }
+        deck.push_back(Card(i, cardTextures[i], deckPosition, 0.01f * i));
+    }
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
 
         glClearColor(0.12f, 0.14f, 0.18f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                sceneShader.use();
+        sceneShader.use();
 
         mat4 projection = perspective(radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         sceneShader.setMat4("projection", projection);
 
-        mat4 view = lookAt(vec3(0.0f, 11.0f, 0.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f));
+        mat4 view;
+        if (cameraMode == 1)
+            view = lookAt(vec3(0.0f, 11.0f, 0.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f));
+        else
+            view = lookAt(vec3(0.0f, 3.0f, 7.0f), vec3(0.0f, 0.5f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
         sceneShader.setMat4("view", view);
 
-                for (Card &card : deck)
+        for (Card &card : deck)
         {
             card.draw(sceneShader);
         }
@@ -93,6 +97,10 @@ void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+        cameraMode = 1;
+    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+        cameraMode = 2;
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
