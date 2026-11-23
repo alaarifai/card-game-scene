@@ -1,5 +1,7 @@
 #include "libs/glad_loader_docs.h"
 #include <GLFW/glfw3.h>
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -63,6 +65,10 @@ int main()
     {
         deck.push_back(Card(i, cardTextures[i], deckPosition, 0.01f * i));
     }
+    std::vector<int> remainingCards = {0, 1, 2, 3, 4};
+    int playedCount = 0;
+    bool gWasPressed = false;
+    srand((unsigned int)time(nullptr));
     float lastFrame = (float)glfwGetTime();
     while (!glfwWindowShouldClose(window))
     {
@@ -70,6 +76,20 @@ int main()
         float deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         processInput(window);
+        bool gIsPressed = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
+
+        if (gIsPressed && !gWasPressed && !remainingCards.empty())
+        {
+            int randomIndex = rand() % (int)remainingCards.size();
+            int cardId = remainingCards[randomIndex];
+            remainingCards.erase(remainingCards.begin() + randomIndex);
+
+            deck[cardId].position = vec3(-2.6f + 1.3f * playedCount, 0.0f, 2.75f);
+            deck[cardId].stackOffset = 0.0f;
+            playedCount++;
+        }
+
+        gWasPressed = gIsPressed;
 
         glClearColor(0.12f, 0.14f, 0.18f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
