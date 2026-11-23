@@ -78,7 +78,7 @@ int main()
         if (cameraMode == 1)
             view = lookAt(vec3(0.0f, 11.0f, 0.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f));
         else
-            view = lookAt(vec3(0.0f, 3.0f, 7.0f), vec3(0.0f, 0.5f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+            view = lookAt(vec3(0.0f, 6.0f, 11.0f), vec3(0.0f, 0.5f, -1.0f), vec3(0.0f, 1.0f, 0.0f));
         sceneShader.setMat4("view", view);
 
         for (Card &card : deck)
