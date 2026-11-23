@@ -54,12 +54,17 @@ int main()
 
     Shader sceneShader("./shaders/vs/scene.vs", "./shaders/fs/scene.fs");
 
-    std::vector<GLuint> cardTextures = loadTextures({"./textures/crate.jpg",
-                                                     "./textures/crate2.jpg",
-                                                     "./textures/ball.jpg",
-                                                     "./textures/white.jpg",
-                                                     "./textures/alrihla.jpg"});
-
+    std::vector<GLuint> cardTextures = loadTextures({"./textures/card0.jpg",
+                                                     "./textures/card1.jpg",
+                                                     "./textures/card2.jpg",
+                                                     "./textures/card3.jpg",
+                                                     "./textures/card4.jpg"});
+    if (cardTextures.size() != 5)
+    {
+        std::cerr << "Missing card textures: expected 5, got " << cardTextures.size() << std::endl;
+        glfwTerminate();
+        return -1;
+    }
     vec3 deckPosition = vec3(4.0f, 0.0f, 2.75f);
 
     std::vector<Card> deck;
