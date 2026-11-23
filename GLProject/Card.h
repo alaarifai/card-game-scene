@@ -10,7 +10,8 @@ public:
     Card(int cardId, GLuint cardTexture, glm::vec3 startPosition, float offset);
 
     void draw(Shader &shader);
-
+    void stand();
+    void lay();
     int id;
     glm::vec3 position;
     float angle;

@@ -83,6 +83,11 @@ int main()
 
         for (Card &card : deck)
         {
+            if (cameraMode == 2)
+                card.stand();
+            else
+                card.lay();
+
             card.draw(sceneShader);
         }
         glfwSwapBuffers(window);

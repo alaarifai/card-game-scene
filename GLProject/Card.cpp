@@ -43,3 +43,12 @@ void Card::draw(Shader &shader)
     shape.transformation(model);
     shape.draw(shader);
 }
+void Card::stand()
+{
+    angle = 90.0f;
+}
+
+void Card::lay()
+{
+    angle = 0.0f;
+}
