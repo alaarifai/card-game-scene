@@ -63,8 +63,12 @@ int main()
     {
         deck.push_back(Card(i, cardTextures[i], deckPosition, 0.01f * i));
     }
+    float lastFrame = (float)glfwGetTime();
     while (!glfwWindowShouldClose(window))
     {
+        float currentFrame = (float)glfwGetTime();
+        float deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
         processInput(window);
 
         glClearColor(0.12f, 0.14f, 0.18f, 1.0f);
@@ -87,7 +91,7 @@ int main()
                 card.stand();
             else
                 card.lay();
-
+            card.update(deltaTime);
             card.draw(sceneShader);
         }
         glfwSwapBuffers(window);
