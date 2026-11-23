@@ -12,6 +12,8 @@
 using namespace glm;
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
+int windowWidth = SCR_WIDTH;
+int windowHeight = SCR_HEIGHT;
 int cameraMode = 1;
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -94,7 +96,8 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         sceneShader.use();
 
-        mat4 projection = perspective(radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        float aspect = windowHeight > 0 ? (float)windowWidth / (float)windowHeight : 1.0f;
+        mat4 projection = perspective(radians(45.0f), aspect, 0.1f, 100.0f);
         sceneShader.setMat4("projection", projection);
 
         mat4 view;
@@ -134,4 +137,6 @@ void processInput(GLFWwindow *window)
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
     glViewport(0, 0, width, height);
+    windowWidth = width;
+    windowHeight = height;
 }
