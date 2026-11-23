@@ -1,0 +1,22 @@
+#pragma once
+
+#include <glm/glm.hpp>
+#include <learnopengl/shader_m.h>
+#include "tools/Polygon.h"
+
+class Card
+{
+public:
+    Card(int cardId, GLuint cardTexture, glm::vec3 startPosition, float offset);
+
+    void draw(Shader &shader);
+
+    int id;
+    glm::vec3 position;
+    float angle;
+    float stackOffset;
+
+private:
+    GLuint texture;
+    PolygonWithTexture shape;
+};

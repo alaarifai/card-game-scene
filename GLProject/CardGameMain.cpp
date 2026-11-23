@@ -6,7 +6,7 @@
 #include <learnopengl/shader_m.h>
 #include "tools/Polygon.h"
 #include "tools/TextureLoader.h"
-
+#include "Card.h"
 using namespace glm;
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
@@ -50,23 +50,19 @@ int main()
 
     Shader sceneShader("./shaders/vs/scene.vs", "./shaders/fs/scene.fs");
 
-    std::vector<GLuint> cardTextures = loadTextures({ "./textures/crate.jpg" });
-        std::vector<vec3> cardVertices = {
-        vec3(-0.5f, 0.0f, 0.0f),
-        vec3( 0.5f, 0.0f, 0.0f),
-        vec3( 0.5f, 0.0f, -1.5f),
-        vec3(-0.5f, 0.0f, -1.5f)
-    };
+       std::vector<GLuint> cardTextures = loadTextures({
+        "./textures/crate.jpg",
+        "./textures/crate2.jpg",
+        "./textures/ball.jpg",
+        "./textures/white.jpg",
+        "./textures/alrihla.jpg"});
 
-    std::vector<vec2> cardTexCoords = {
-        vec2(0.0f, 0.0f),
-        vec2(1.0f, 0.0f),
-        vec2(1.0f, 1.0f),
-        vec2(0.0f, 1.0f)
-    };
+    vec3 deckPosition = vec3(4.0f, 0.0f, 2.75f);
 
-    PolygonWithTexture card(cardVertices, cardTexCoords);
-    card.setTexture(cardTextures[0]);
+    std::vector<Card> deck;
+    for (int i = 0; i < 5; i++)
+    {
+              deck.push_back(Card(i, cardTextures[i], deckPosition, 0.01f * i));   }
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
@@ -81,9 +77,10 @@ int main()
         mat4 view = lookAt(vec3(0.0f, 11.0f, 0.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f));
         sceneShader.setMat4("view", view);
 
-        mat4 model = translate(mat4(1.0f), vec3(4.0f, 0.0f, 2.75f));
-        card.transformation(model);
-        card.draw(sceneShader);
+                for (Card &card : deck)
+        {
+            card.draw(sceneShader);
+        }
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
