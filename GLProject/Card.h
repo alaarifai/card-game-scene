@@ -13,9 +13,14 @@ public:
     void draw(Shader &shader);
     void stand();
     void lay();
+    void moveTo(glm::vec3 target);
 
     int id;
     glm::vec3 position;
+    glm::vec3 startPosition;
+    glm::vec3 targetPosition;
+    float progress;
+    bool moving;
     float angle;
     float targetAngle;
     float stackOffset;

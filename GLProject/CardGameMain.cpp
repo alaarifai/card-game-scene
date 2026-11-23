@@ -84,8 +84,7 @@ int main()
             int cardId = remainingCards[randomIndex];
             remainingCards.erase(remainingCards.begin() + randomIndex);
 
-            deck[cardId].position = vec3(-2.6f + 1.3f * playedCount, 0.0f, 2.75f);
-            deck[cardId].stackOffset = 0.0f;
+            deck[cardId].moveTo(vec3(-2.6f + 1.3f * playedCount, 0.0f, 2.75f));
             playedCount++;
         }
 
