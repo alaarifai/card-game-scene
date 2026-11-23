@@ -71,6 +71,7 @@ void Card::update(float deltaTime)
 
         float t = progress * progress * (3.0f - 2.0f * progress);
         position = mix(startPosition, targetPosition, t);
+        position.y += 0.8f * sin(3.14159265f * progress);
     }
 }
 
