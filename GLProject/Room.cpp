@@ -28,6 +28,7 @@ static PolygonWithTexture* posterShadow = nullptr;   // same torn shape, dark an
 static std::vector<GLuint> decorTextures;            // [0] = chessboard picture
 static std::vector<Box*> decorParts;                 // table top, legs, stools
 static PolygonWithTexture* chessBoard = nullptr;     // the board picture, lying on the table top
+static std::vector<GLuint> chestTexture;             // decor piece 2: treasure chest picture (the box faces show it)
 
 // Room limits (same numbers as the contract): x,z in [-15, 15], floor y = -3, ceiling y = 9
 static const float ROOM = 15.0f;
@@ -250,6 +251,18 @@ void buildRoom()
         { glm::vec3(CX - B, BY, CZ + B), glm::vec3(CX + B, BY, CZ + B), glm::vec3(CX + B, BY, CZ - B), glm::vec3(CX - B, BY, CZ - B) },
         { glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec2(0.0f, 1.0f) });
     chessBoard->setTexture(decorTextures[0]);
+
+    // 9. Decor piece 2: treasure chest at (10, -3, -10) (contract position 2): a body box + a slightly wider lid box.
+    //    The picture is a carved chest front, so putting it on every face of both boxes looks like one ornate chest.
+    chestTexture = loadTextures({ "textures/decor_chest.png" }, GL_CLAMP_TO_EDGE, GL_LINEAR);
+    if (chestTexture.empty())
+    {
+        std::cerr << "Room: chest texture failed to load" << std::endl;
+        return;
+    }
+    // body: 1.0 tall sitting on the floor (center y = -3 + 0.5); lid: 0.5 tall on top (center y = -2 + 0.25)
+    decorParts.push_back(new Box(glm::vec3(10.0f, FLOOR_Y + 0.5f, -10.0f), glm::vec3(2.4f, 1.0f, 1.6f), chestTexture[0]));
+    decorParts.push_back(new Box(glm::vec3(10.0f, FLOOR_Y + 1.25f, -10.0f), glm::vec3(2.5f, 0.5f, 1.7f), chestTexture[0]));
 }
 
 void drawRoom(Shader& shader)
@@ -323,6 +336,7 @@ void destroyRoom()
         chessBoard = nullptr;
     }
     glDeleteTextures(static_cast<GLsizei>(decorTextures.size()), decorTextures.data());
+    glDeleteTextures(static_cast<GLsizei>(chestTexture.size()), chestTexture.data());
     if (posterShadow)
     {
         posterShadow->deleteBuffers();
