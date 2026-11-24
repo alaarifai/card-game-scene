@@ -99,6 +99,21 @@ std::vector<GLuint> loadTextures(
 
         glGenerateMipmap(GL_TEXTURE_2D);
 
+        // Quality + speed: with GL_LINEAR the mipmaps above would never be used for far-away surfaces.
+        // Trilinear mipmapping picks a smaller copy of the image when the surface is small on screen
+        // (no shimmering, and the GPU reads far less memory).
+        if (filterOption == GL_LINEAR)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+        // Anisotropic filtering keeps the floor sharp when seen at a shallow angle (camera 2).
+        // These two numbers come from the GL extension EXT_texture_filter_anisotropic.
+        const GLenum MAX_ANISOTROPY = 0x84FE, MAX_ANISOTROPY_LIMIT = 0x84FF;
+        GLfloat maxAniso = 1.0f;
+        while (glGetError() != GL_NO_ERROR) {}          // clear old errors so only this query is checked
+        glGetFloatv(MAX_ANISOTROPY_LIMIT, &maxAniso);
+        if (glGetError() == GL_NO_ERROR && maxAniso > 1.0f)
+            glTexParameterf(GL_TEXTURE_2D, MAX_ANISOTROPY, maxAniso > 8.0f ? 8.0f : maxAniso);
+
         stbi_image_free(data);
 
         textures.push_back(texture);
