@@ -11,16 +11,20 @@ uniform vec3 objectColor;
 uniform float emissive;   // 1.0 = glowing surface (lantern glass): skip the lighting, keep the colour
 
 // ---- Lights (kept in the shader on purpose: only Room.cpp knows where the lanterns hang) ----
-const int NL = 3;
-const vec3 LP[3] = vec3[3](
-    vec3(-4.0, 3.4, 0.0),     // warm lantern, left of the table
-    vec3( 4.0, 3.4, 0.0),     // warm lantern, right of the table
-    vec3( 0.0, 8.0, 13.0));   // cool fill from the player's side, so the shadows stay readable
-const vec3 LC[3] = vec3[3](
+const int NL = 5;
+const vec3 LP[5] = vec3[5](
+    vec3(-4.0, 3.4, 0.0),      // warm lantern, left of the table
+    vec3( 4.0, 3.4, 0.0),      // warm lantern, right of the table
+    vec3( 0.0, 8.0, 13.0),     // cool fill from the player's side, so the shadows stay readable
+    vec3(-5.6, 2.7, -13.1),    // wall sconce, left of the poster
+    vec3( 5.6, 2.7, -13.1));   // wall sconce, right of the poster
+const vec3 LC[5] = vec3[5](
     vec3(1.00, 0.72, 0.40),
     vec3(1.00, 0.72, 0.40),
-    vec3(0.30, 0.36, 0.52));
-const float LR[3] = float[3](15.0, 15.0, 45.0);   // reach of each light
+    vec3(0.30, 0.36, 0.52),
+    vec3(1.00, 0.80, 0.50),
+    vec3(1.00, 0.80, 0.50));
+const float LR[5] = float[5](15.0, 15.0, 45.0, 12.0, 12.0);   // reach of each light
 const float INTENSITY = 0.85;
 const float AMBIENT = 0.42;                       // light that reaches even the far corners
 const vec3 SKY = vec3(0.10, 0.11, 0.14);          // a little extra on surfaces that face up
@@ -57,3 +61,4 @@ void main()
 
     FragColor = vec4(min(color, vec3(1.0)), 1.0);
 }
+

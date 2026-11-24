@@ -42,6 +42,11 @@ static std::vector<Box*> chairParts;                 // 6 chairs, every piece is
 static std::vector<Box*> lanternParts;               // lantern metal: chain, cap, posts, base
 static std::vector<Box*> glowParts;                  // lantern glass: drawn with emissive = 1
 
+// Potted plant in the back-left corner: brass pot + trunk are Box, the fronds are flat quads
+static std::vector<GLuint> leafTexture;              // [0] = palm frond with alpha
+static std::vector<Box*> plantParts;
+static std::vector<PolygonWithTexture*> plantLeaves;
+
 // Room limits (same numbers as the contract): x,z in [-15, 15], floor y = -3, ceiling y = 9
 static const float ROOM = 15.0f;
 static const float FLOOR_Y = -3.0f;
@@ -274,6 +279,63 @@ void buildRoom()
                                     glm::vec3(1.0f, 0.80f, 0.48f)));                                                         // glass
     }
 
+    // Two wall sconces on the back wall, left and right of the poster: same recipe as the lanterns,
+    // but bolted on with a bracket and a bit smaller.
+    for (float sx : { -5.6f, 5.6f })
+    {
+        const float SZ = -ROOM + 0.55f;    // how far the sconce sticks out of the back wall
+        lanternParts.push_back(new Box(glm::vec3(sx, 2.30f, -ROOM + 0.20f), glm::vec3(0.18f, 0.22f, 0.60f), zoneTexture[0], BRASS)); // bracket
+        lanternParts.push_back(new Box(glm::vec3(sx, 2.82f, SZ), glm::vec3(0.88f, 0.16f, 0.88f), zoneTexture[0], BRASS));           // cap
+        lanternParts.push_back(new Box(glm::vec3(sx, 1.90f, SZ), glm::vec3(0.80f, 0.14f, 0.80f), zoneTexture[0], BRASS));           // base
+        for (int px = -1; px <= 1; px += 2)
+            for (int pz = -1; pz <= 1; pz += 2)
+                lanternParts.push_back(new Box(glm::vec3(sx + px * 0.33f, 2.35f, SZ + pz * 0.33f),
+                                              glm::vec3(0.08f, 0.80f, 0.08f), zoneTexture[0], BRASS));                            // 4 posts
+        glowParts.push_back(new Box(glm::vec3(sx, 2.35f, SZ), glm::vec3(0.60f, 0.72f, 0.60f), zoneTexture[0],
+                                    glm::vec3(1.0f, 0.86f, 0.58f)));                                                             // glass
+    }
+
+    // Potted plant in the back-left corner. Pot + trunk are Boxes; every frond is one flat quad with
+    // a frond picture that has real transparency, so "discard" cuts the leaf shape out of the quad.
+    leafTexture = loadTextures({ "textures/leaf.png" }, GL_CLAMP_TO_EDGE, GL_LINEAR);
+    if (leafTexture.empty())
+    {
+        std::cerr << "Room: leaf texture failed to load" << std::endl;
+        return;
+    }
+    const float PLX = -11.5f, PLZ = -6.6f;
+    plantParts.push_back(new Box(glm::vec3(PLX, FLOOR_Y + 0.06f, PLZ), glm::vec3(0.62f, 0.12f, 0.62f), zoneTexture[0], BRASS)); // pot foot
+    plantParts.push_back(new Box(glm::vec3(PLX, FLOOR_Y + 0.40f, PLZ), glm::vec3(0.80f, 0.55f, 0.80f), zoneTexture[0], BRASS)); // pot body
+    plantParts.push_back(new Box(glm::vec3(PLX, FLOOR_Y + 0.73f, PLZ), glm::vec3(0.92f, 0.12f, 0.92f), zoneTexture[0], BRASS)); // pot rim
+    plantParts.push_back(new Box(glm::vec3(PLX, FLOOR_Y + 0.79f, PLZ), glm::vec3(0.78f, 0.06f, 0.78f), zoneTexture[0],
+                                 glm::vec3(0.24f, 0.18f, 0.12f)));                                                             // soil
+    plantParts.push_back(new Box(glm::vec3(PLX, FLOOR_Y + 1.14f, PLZ), glm::vec3(0.18f, 0.70f, 0.18f), tableTextures[WOOD]));    // trunk
+
+    const glm::vec3 CROWN(PLX, FLOOR_Y + 1.50f, PLZ);
+    auto addFrond = [&](float angleDeg, float tiltDeg, float len, float halfWidth)
+    {
+        const float a = glm::radians(angleDeg), t = glm::radians(tiltDeg);
+        glm::vec3 dir(std::cos(a) * std::cos(t), std::sin(t), std::sin(a) * std::cos(t));
+        glm::vec3 side = glm::cross(dir, glm::vec3(0.0f, 1.0f, 0.0f));
+        if (glm::length(side) < 0.01f)
+            side = glm::vec3(1.0f, 0.0f, 0.0f);
+        side = glm::normalize(side);
+        glm::vec3 base = CROWN + dir * 0.06f;
+        glm::vec3 tip = base + dir * len;
+        tip.y -= len * 0.25f;            // the frond droops, so it doesn't look like a straight blade
+        plantLeaves.push_back(new PolygonWithTexture(
+            // the quad is the frond's bounding box; the texture's alpha decides the real leaf shape
+            { base - side * halfWidth, base + side * halfWidth,
+              tip + side * halfWidth * 0.80f, tip - side * halfWidth * 0.80f },
+            { glm::vec2(0.0f, 0.0f), glm::vec2(0.0f, 1.0f), glm::vec2(1.0f, 1.0f), glm::vec2(1.0f, 0.0f) },
+            glm::vec3(1.35f, 1.55f, 1.25f)));
+        plantLeaves.back()->setTexture(leafTexture[0]);
+    };
+    for (int i = 0; i < 12; i++)
+        addFrond(30.0f * i, 18.0f + (i % 3) * 14.0f, 1.80f + (i % 4) * 0.16f, 0.46f);
+    for (int i = 0; i < 5; i++)
+        addFrond(72.0f * i, 58.0f, 1.30f, 0.36f);
+
     // 7. Poster on the back wall (z = -15). The picture is 1024 x 1536 (ratio 2:3), so 8 tall -> 5.333 wide.
     //    It floats 0.02 in front of the wall so the two surfaces don't fight over depth (same idea as the 0.005 on the table).
     posterTexture = loadTextures({ "textures/poster.png" }, GL_CLAMP_TO_EDGE, GL_LINEAR);
@@ -387,6 +449,12 @@ void drawRoom(Shader& shader)
     for (Box* part : chairParts)
         part->draw(shader);
 
+    // The potted plant in the back-left corner
+    for (Box* part : plantParts)
+        part->draw(shader);
+    for (PolygonWithTexture* leaf : plantLeaves)
+        leaf->draw(shader);
+
     // The 3 zone frames, on top of the felt
     for (PolygonWithTexture* bar : zoneParts)
         bar->draw(shader);
@@ -466,6 +534,19 @@ void destroyRoom()
     glDeleteTextures(static_cast<GLsizei>(decorTextures.size()), decorTextures.data());
     glDeleteTextures(static_cast<GLsizei>(chestTexture.size()), chestTexture.data());
     glDeleteTextures(static_cast<GLsizei>(rugTexture.size()), rugTexture.data());
+    glDeleteTextures(static_cast<GLsizei>(leafTexture.size()), leafTexture.data());
+    for (PolygonWithTexture* leaf : plantLeaves)
+    {
+        leaf->deleteBuffers();
+        delete leaf;
+    }
+    plantLeaves.clear();
+    for (Box* part : plantParts)
+    {
+        part->destroy();
+        delete part;
+    }
+    plantParts.clear();
     if (rugPart)
     {
         rugPart->deleteBuffers();
