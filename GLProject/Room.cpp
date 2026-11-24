@@ -15,6 +15,10 @@ static std::vector<PolygonWithTexture*> roomParts;  // floor, 4 walls, ceiling
 static std::vector<GLuint> tableTextures;           // [0] = green felt (top), [1] = dark wood (legs)
 static std::vector<Box*> tableParts;                // top, then 4 legs
 
+// The 3 zone frames drawn on the felt (deck / played / opponent), made of thin flat quads
+static std::vector<GLuint> zoneTexture;             // [0] = plain white (tinted by each frame's color)
+static std::vector<PolygonWithTexture*> zoneParts;
+
 // Room limits (same numbers as the contract): x,z in [-15, 15], floor y = -3, ceiling y = 9
 static const float ROOM = 15.0f;
 static const float FLOOR_Y = -3.0f;
@@ -119,6 +123,69 @@ void buildRoom()
             addBox(glm::vec3(x, -0.85f, z),   glm::vec3(0.7f, 0.3f, 0.7f),   WOOD);  // top block
             addBox(glm::vec3(x, -2.85f, z),   glm::vec3(0.7f, 0.3f, 0.7f),   WOOD);  // foot
         }
+
+    // 6. Zone decoration on the felt: a gold "inlay" look (outer line + thin inner line + corner squares),
+    //    plus a faint outline for each of the 5 card slots. Everything is 0.005 above the felt (no z-fighting).
+    //    A lying card is 1 wide and 1.5 deep (z from 1.25 to 2.75 for the player's row).
+    zoneTexture = loadTextures({ "textures/white.jpg" }, GL_REPEAT, GL_LINEAR);
+    if (zoneTexture.empty())
+    {
+        std::cerr << "Room: white texture failed to load" << std::endl;
+        return;
+    }
+    const float LINE_Y = 0.005f;
+
+    // One flat bar (a quad lying on the table) between x0..x1 and z0..z1 at height y
+    auto addBar = [&](float x0, float x1, float z0, float z1, float y, glm::vec3 color)
+    {
+        PolygonWithTexture* bar = new PolygonWithTexture(
+            { glm::vec3(x0, y, z1), glm::vec3(x1, y, z1), glm::vec3(x1, y, z0), glm::vec3(x0, y, z0) },
+            { glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec2(0.0f, 1.0f) },
+            color);
+        bar->setTexture(zoneTexture[0]);
+        zoneParts.push_back(bar);
+    };
+
+    // A rectangle outline = 4 bars of thickness t (left/right bars stop short of the corners so none overlap)
+    auto addOutline = [&](float xMin, float xMax, float zMin, float zMax, float t, glm::vec3 color)
+    {
+        addBar(xMin, xMax, zMax - t, zMax, LINE_Y, color);              // near the player
+        addBar(xMin, xMax, zMin, zMin + t, LINE_Y, color);              // far side
+        addBar(xMin, xMin + t, zMin + t, zMax - t, LINE_Y, color);      // left
+        addBar(xMax - t, xMax, zMin + t, zMax - t, LINE_Y, color);      // right
+    };
+
+    // One decorated zone: thick outer line, thin inner line, and a small square on each corner
+    auto addZone = [&](float xMin, float xMax, float zMin, float zMax, glm::vec3 color)
+    {
+        addOutline(xMin, xMax, zMin, zMax, 0.04f, color);
+        addOutline(xMin + 0.08f, xMax - 0.08f, zMin + 0.08f, zMax - 0.08f, 0.015f, color);
+        const float c = 0.16f, y = LINE_Y + 0.0015f;                    // corner squares sit a bit higher
+        addBar(xMin, xMin + c, zMin, zMin + c, y, color);
+        addBar(xMax - c, xMax, zMin, zMin + c, y, color);
+        addBar(xMin, xMin + c, zMax - c, zMax, y, color);
+        addBar(xMax - c, xMax, zMax - c, zMax, y, color);
+    };
+
+    // Five card slots in a row (same x as the cards: -2.6, -1.3, 0, 1.3, 2.6), slightly bigger than a card
+    auto addSlots = [&](float centerZ, glm::vec3 color)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            float cx = -2.6f + 1.3f * i;
+            addOutline(cx - 0.55f, cx + 0.55f, centerZ - 0.8f, centerZ + 0.8f, 0.02f, color);
+        }
+    };
+
+    const glm::vec3 GOLD(0.85f, 0.70f, 0.25f);      // active zones
+    const glm::vec3 DIM_GOLD(0.5f, 0.4f, 0.18f);    // opponent zone (empty for now)
+    const glm::vec3 SLOT(0.6f, 0.5f, 0.22f);
+
+    addZone(-3.3f,  3.3f,  1.0f,  3.0f, GOLD);      // played zone (center 0, +2)
+    addSlots(2.0f, SLOT);
+    addZone( 3.42f, 4.58f, 1.0f,  3.0f, GOLD);      // deck zone   (center +4, +2)
+    addZone(-3.3f,  3.3f, -3.0f, -1.0f, DIM_GOLD);  // opponent    (center 0, -2)
+    addSlots(-2.0f, DIM_GOLD * 0.8f);
 }
 
 void drawRoom(Shader& shader)
@@ -132,6 +199,10 @@ void drawRoom(Shader& shader)
     // The table (top + 4 legs), drawn before the ceiling
     for (Box* part : tableParts)
         part->draw(shader);
+
+    // The 3 zone frames, on top of the felt
+    for (PolygonWithTexture* bar : zoneParts)
+        bar->draw(shader);
 
     // Ceiling: culled when seen from above, so the top camera can see the table through it
     if (!roomParts.empty())
@@ -157,6 +228,13 @@ void destroyRoom()
         delete part;
     }
     tableParts.clear();
+    for (PolygonWithTexture* bar : zoneParts)
+    {
+        bar->deleteBuffers();
+        delete bar;
+    }
+    zoneParts.clear();
+    glDeleteTextures(static_cast<GLsizei>(zoneTexture.size()), zoneTexture.data());
     glDeleteTextures(static_cast<GLsizei>(tableTextures.size()), tableTextures.data());
     glDeleteTextures(static_cast<GLsizei>(roomTextures.size()), roomTextures.data());
 }
