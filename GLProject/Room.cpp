@@ -39,6 +39,7 @@ static glm::mat4 decorModelMatrix(1.0f);             // places it at (-12, -3, 8
 static std::vector<GLuint> rugTexture;               // [0] = the carpet picture
 static PolygonWithTexture* rugPart = nullptr;        // the carpet, a flat quad on the floor
 static std::vector<Box*> chairParts;                 // 6 chairs, every piece is a Box
+static std::vector<Box*> radioParts;                  // radio, shelf and small desk fan
 static std::vector<Box*> lanternParts;               // lantern metal: chain, cap, posts, base
 static std::vector<Box*> glowParts;                  // lantern glass: drawn with emissive = 1
 
@@ -251,8 +252,21 @@ void buildRoom()
         place(glm::vec3( 0.55f, 0.75f, -0.55f), glm::vec3(0.14f, 1.50f, 0.14f), wood);
         place(glm::vec3(0.0f, 1.58f,  0.0f), glm::vec3(1.35f, 0.16f, 1.35f), wood);       // seat
         place(glm::vec3(0.0f, 1.70f,  0.0f), glm::vec3(1.05f, 0.10f, 1.00f), cloth);      // cushion
-        place(glm::vec3(0.0f, 1.80f, -0.60f), glm::vec3(1.30f, 1.00f, 0.14f), wood);      // backrest
-        place(glm::vec3(0.0f, 2.36f, -0.60f), glm::vec3(1.45f, 0.14f, 0.18f), wood);      // top rail
+        // Open, framed backrest: it looks lighter than one large solid wooden block.
+        place(glm::vec3(-0.52f, 1.95f, -0.60f), glm::vec3(0.13f, 1.05f, 0.16f), wood);
+        place(glm::vec3( 0.52f, 1.95f, -0.60f), glm::vec3(0.13f, 1.05f, 0.16f), wood);
+        place(glm::vec3(0.0f, 1.48f, -0.60f), glm::vec3(1.15f, 0.13f, 0.17f), wood);
+        place(glm::vec3(0.0f, 2.46f, -0.60f), glm::vec3(1.38f, 0.15f, 0.19f), wood);
+        for (int i = -1; i <= 1; i++)
+            place(glm::vec3(0.30f * i, 1.95f, -0.60f), glm::vec3(0.07f, 0.78f, 0.12f), wood);
+
+        // Two armrests with short supports, matching the reference chair silhouette.
+        for (int side = -1; side <= 1; side += 2)
+        {
+            place(glm::vec3(0.68f * side, 1.91f, 0.38f), glm::vec3(0.12f, 0.58f, 0.12f), wood);
+            place(glm::vec3(0.68f * side, 1.91f, -0.42f), glm::vec3(0.12f, 0.58f, 0.12f), wood);
+            place(glm::vec3(0.68f * side, 2.22f, -0.02f), glm::vec3(0.16f, 0.12f, 1.02f), wood);
+        }
     };
 
     // 6 chairs: two on each long side, one on each end. rotY turns every chair towards the table.
@@ -262,6 +276,94 @@ void buildRoom()
     addChair(glm::vec3( 2.9f, FLOOR_Y, -5.7f),   0.0f, WOOD, FELT);
     addChair(glm::vec3(-7.7f, FLOOR_Y,  0.0f),  90.0f, WOOD, FELT);   // left end, faces +x
     addChair(glm::vec3( 7.7f, FLOOR_Y,  0.0f), -90.0f, WOOD, FELT);   // right end, faces -x
+
+    // 6c. Vintage radio and compact fan on a side shelf at the back-right of the table.
+    // Keep the set close enough to the table so it remains visible from camera 2.
+    auto addRadioPart = [&](glm::vec3 center, glm::vec3 size, GLuint texture, glm::vec3 tint)
+    {
+        radioParts.push_back(new Box(center, size, texture, tint));
+    };
+
+    const glm::vec3 RADIO_WOOD(0.62f, 0.46f, 0.27f);
+    const glm::vec3 RADIO_DARK(0.12f, 0.10f, 0.075f);
+    const glm::vec3 RADIO_BRASS(0.72f, 0.50f, 0.22f);
+
+    // Side shelf (right-back corner, just behind the playing surface).
+    addRadioPart(glm::vec3(5.00f, -1.43f, -7.50f),
+                 glm::vec3(3.50f, 0.18f, 1.90f), tableTextures[WOOD], RADIO_WOOD);
+
+    // Four short wooden legs.
+    for (float x : {3.45f, 6.55f})
+        for (float z : {-8.22f, -6.78f})
+            addRadioPart(glm::vec3(x, -2.18f, z),
+                         glm::vec3(0.14f, 1.55f, 0.14f), tableTextures[WOOD], RADIO_WOOD);
+
+    // Radio case; its front faces +Z (toward camera 2).
+    addRadioPart(glm::vec3(4.25f, -0.78f, -7.53f),
+                 glm::vec3(1.70f, 1.10f, 0.90f), tableTextures[WOOD], RADIO_WOOD);
+
+    // Dark front panel.
+    addRadioPart(glm::vec3(4.25f, -0.78f, -7.065f),
+                 glm::vec3(1.54f, 0.94f, 0.045f), zoneTexture[0], RADIO_DARK);
+
+    // Brass speaker grille.
+    for (int i = 0; i < 6; i++)
+    {
+        float y = -1.10f + 0.12f * i;
+        addRadioPart(glm::vec3(3.88f, y, -7.035f),
+                     glm::vec3(0.40f, 0.022f, 0.025f), zoneTexture[0], RADIO_BRASS);
+    }
+
+    // Dim amber tuning display.
+    addRadioPart(glm::vec3(4.62f, -0.72f, -7.035f),
+                 glm::vec3(0.42f, 0.34f, 0.025f), zoneTexture[0], RADIO_DARK);
+    glowParts.push_back(new Box(glm::vec3(4.62f, -0.72f, -7.015f),
+                                glm::vec3(0.34f, 0.25f, 0.018f), zoneTexture[0],
+                                glm::vec3(0.38f, 0.18f, 0.045f)));
+
+    // Brass tuning knobs and short antenna.
+    addRadioPart(glm::vec3(4.90f, -1.10f, -7.025f),
+                 glm::vec3(0.12f, 0.12f, 0.07f), zoneTexture[0], RADIO_BRASS);
+    addRadioPart(glm::vec3(4.90f, -0.42f, -7.025f),
+                 glm::vec3(0.12f, 0.12f, 0.07f), zoneTexture[0], RADIO_BRASS);
+    addRadioPart(glm::vec3(4.82f, -0.03f, -7.80f),
+                 glm::vec3(0.025f, 0.62f, 0.025f), zoneTexture[0], RADIO_BRASS);
+
+    // Small shaded amber lamp in front-left of the radio.
+    addRadioPart(glm::vec3(3.15f, -1.27f, -6.78f),
+                 glm::vec3(0.34f, 0.07f, 0.34f), tableTextures[WOOD], RADIO_WOOD);
+    addRadioPart(glm::vec3(3.15f, -1.03f, -6.78f),
+                 glm::vec3(0.055f, 0.42f, 0.055f), zoneTexture[0], RADIO_BRASS);
+    addRadioPart(glm::vec3(3.15f, -0.78f, -6.78f),
+                 glm::vec3(0.28f, 0.25f, 0.28f), zoneTexture[0], RADIO_BRASS);
+    glowParts.push_back(new Box(glm::vec3(3.15f, -0.78f, -6.74f),
+                                glm::vec3(0.18f, 0.15f, 0.18f), zoneTexture[0],
+                                glm::vec3(0.32f, 0.14f, 0.035f)));
+
+    // Compact desk fan immediately beside the radio.
+    addRadioPart(glm::vec3(6.05f, -1.24f, -7.50f),
+                 glm::vec3(0.66f, 0.14f, 0.62f), tableTextures[WOOD], RADIO_WOOD);
+    addRadioPart(glm::vec3(6.05f, -0.87f, -7.50f),
+                 glm::vec3(0.12f, 0.62f, 0.12f), zoneTexture[0], RADIO_BRASS);
+
+    const float FAN_FRONT_Z = -7.03f;
+    // Fan's square brass guard.
+    addRadioPart(glm::vec3(6.05f, -0.43f, FAN_FRONT_Z),
+                 glm::vec3(0.82f, 0.075f, 0.07f), zoneTexture[0], RADIO_BRASS);
+    addRadioPart(glm::vec3(6.05f, -1.15f, FAN_FRONT_Z),
+                 glm::vec3(0.82f, 0.075f, 0.07f), zoneTexture[0], RADIO_BRASS);
+    addRadioPart(glm::vec3(5.69f, -0.79f, FAN_FRONT_Z),
+                 glm::vec3(0.075f, 0.72f, 0.07f), zoneTexture[0], RADIO_BRASS);
+    addRadioPart(glm::vec3(6.41f, -0.79f, FAN_FRONT_Z),
+                 glm::vec3(0.075f, 0.72f, 0.07f), zoneTexture[0], RADIO_BRASS);
+
+    // Two simple crossed blades and a brass hub.
+    addRadioPart(glm::vec3(6.05f, -0.79f, FAN_FRONT_Z + 0.045f),
+                 glm::vec3(0.11f, 0.52f, 0.055f), zoneTexture[0], RADIO_DARK);
+    addRadioPart(glm::vec3(6.05f, -0.79f, FAN_FRONT_Z + 0.050f),
+                 glm::vec3(0.52f, 0.11f, 0.055f), zoneTexture[0], RADIO_DARK);
+    addRadioPart(glm::vec3(6.05f, -0.79f, FAN_FRONT_Z + 0.085f),
+                 glm::vec3(0.15f, 0.15f, 0.07f), zoneTexture[0], RADIO_BRASS);
 
     // Two lanterns hanging over the table. The glass box glows (emissive), and its position is
     // exactly one of the two warm lights hard-coded in scene.fs, so the light really comes from it.
@@ -449,6 +551,10 @@ void drawRoom(Shader& shader)
     for (Box* part : chairParts)
         part->draw(shader);
 
+    // Radio shelf, vintage radio and small fan on the right side of the room.
+    for (Box* part : radioParts)
+        part->draw(shader);
+
     // The potted plant in the back-left corner
     for (Box* part : plantParts)
         part->draw(shader);
@@ -559,6 +665,12 @@ void destroyRoom()
         delete part;
     }
     chairParts.clear();
+    for (Box* part : radioParts)
+    {
+        part->destroy();
+        delete part;
+    }
+    radioParts.clear();
     for (Box* part : lanternParts)
     {
         part->destroy();

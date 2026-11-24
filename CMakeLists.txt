@@ -82,21 +82,22 @@ target_include_directories(GLProject PRIVATE
 )
 
 if(WIN32)
-target_link_libraries(GLProject PRIVATE
-    OpenGL.SharedModule
-    glfw3
-    assimp
-    spdlog
-    OpenGL::GL
-)
+    target_link_libraries(GLProject PRIVATE
+        OpenGL.SharedModule
+        glfw3
+        assimp
+        spdlog
+        winmm
+        OpenGL::GL
+    )
 else()
-target_link_libraries(GLProject PRIVATE
-    OpenGL.SharedModule
-    glfw
-    assimp
-    spdlog
-    OpenGL::GL
-)
+    target_link_libraries(GLProject PRIVATE
+        OpenGL.SharedModule
+        glfw
+        assimp
+        spdlog
+        OpenGL::GL
+    )
 endif()
 
 add_custom_command(
