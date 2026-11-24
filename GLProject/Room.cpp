@@ -22,6 +22,7 @@ static std::vector<PolygonWithTexture*> zoneParts;
 // The torn poster on the back wall (a PNG with real transparency, see scripts/make_poster.ps1)
 static std::vector<GLuint> posterTexture;
 static PolygonWithTexture* posterPart = nullptr;
+static PolygonWithTexture* posterShadow = nullptr;   // same torn shape, dark and shifted: fake drop shadow
 
 // Room limits (same numbers as the contract): x,z in [-15, 15], floor y = -3, ceiling y = 9
 static const float ROOM = 15.0f;
@@ -190,6 +191,31 @@ void buildRoom()
     addZone( 3.42f, 4.58f, 1.0f,  3.0f, GOLD);      // deck zone   (center +4, +2)
     addZone(-3.3f,  3.3f, -3.0f, -1.0f, DIM_GOLD);  // opponent    (center 0, -2)
     addSlots(-2.0f, DIM_GOLD * 0.8f);
+
+    // 7. Poster on the back wall (z = -15). The picture is 1024 x 1536 (ratio 2:3), so 8 tall -> 5.333 wide.
+    //    It floats 0.02 in front of the wall so the two surfaces don't fight over depth (same idea as the 0.005 on the table).
+    posterTexture = loadTextures({ "textures/poster.png" }, GL_CLAMP_TO_EDGE, GL_LINEAR);
+    if (posterTexture.empty())
+    {
+        std::cerr << "Room: poster texture failed to load" << std::endl;
+        return;
+    }
+    const float PW = 8.0f * 2.0f / 3.0f / 2.0f;     // half width
+    const float PB = -1.0f, PT = 7.0f;              // bottom and top height of the poster (lowered by 1.5)
+    const float PZ = -ROOM + 0.02f;
+    posterPart = new PolygonWithTexture(
+        { glm::vec3(-PW, PT, PZ), glm::vec3(-PW, PB, PZ), glm::vec3(PW, PB, PZ), glm::vec3(PW, PT, PZ) },
+        { glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f) });
+    posterPart->setTexture(posterTexture[0]);
+
+    // Shadow: same poster picture, tinted almost black, moved right and down, and 0.01 closer to the wall.
+    // It uses the same alpha holes, so the shadow follows the torn edge too.
+    posterShadow = new PolygonWithTexture(
+        { glm::vec3(-PW + 0.18f, PT - 0.18f, PZ - 0.01f), glm::vec3(-PW + 0.18f, PB - 0.18f, PZ - 0.01f),
+          glm::vec3( PW + 0.18f, PB - 0.18f, PZ - 0.01f), glm::vec3( PW + 0.18f, PT - 0.18f, PZ - 0.01f) },
+        { glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f) },
+        glm::vec3(0.12f, 0.09f, 0.06f));
+    posterShadow->setTexture(posterTexture[0]);
 }
 
 void drawRoom(Shader& shader)
@@ -207,6 +233,12 @@ void drawRoom(Shader& shader)
     // The 3 zone frames, on top of the felt
     for (PolygonWithTexture* bar : zoneParts)
         bar->draw(shader);
+
+    // The poster on the back wall (shadow first, then the poster over it)
+    if (posterShadow)
+        posterShadow->draw(shader);
+    if (posterPart)
+        posterPart->draw(shader);
 
     // Ceiling: culled when seen from above, so the top camera can see the table through it
     if (!roomParts.empty())
@@ -238,6 +270,19 @@ void destroyRoom()
         delete bar;
     }
     zoneParts.clear();
+    if (posterShadow)
+    {
+        posterShadow->deleteBuffers();
+        delete posterShadow;
+        posterShadow = nullptr;
+    }
+    if (posterPart)
+    {
+        posterPart->deleteBuffers();
+        delete posterPart;
+        posterPart = nullptr;
+    }
+    glDeleteTextures(static_cast<GLsizei>(posterTexture.size()), posterTexture.data());
     glDeleteTextures(static_cast<GLsizei>(zoneTexture.size()), zoneTexture.data());
     glDeleteTextures(static_cast<GLsizei>(tableTextures.size()), tableTextures.data());
     glDeleteTextures(static_cast<GLsizei>(roomTextures.size()), roomTextures.data());
