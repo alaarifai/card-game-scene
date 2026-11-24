@@ -83,6 +83,8 @@ std::vector<GLuint> loadTextures(
             filterOption
         );
 
+        // Rows of RGB images are 3 bytes per pixel; widths not divisible by 4 (e.g. 1254) need alignment 1
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         glTexImage2D(
             GL_TEXTURE_2D,
             0,
