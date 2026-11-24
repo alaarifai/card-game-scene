@@ -19,6 +19,10 @@ static std::vector<Box*> tableParts;                // top, then 4 legs
 static std::vector<GLuint> zoneTexture;             // [0] = plain white (tinted by each frame's color)
 static std::vector<PolygonWithTexture*> zoneParts;
 
+// The torn poster on the back wall (a PNG with real transparency, see scripts/make_poster.ps1)
+static std::vector<GLuint> posterTexture;
+static PolygonWithTexture* posterPart = nullptr;
+
 // Room limits (same numbers as the contract): x,z in [-15, 15], floor y = -3, ceiling y = 9
 static const float ROOM = 15.0f;
 static const float FLOOR_Y = -3.0f;
