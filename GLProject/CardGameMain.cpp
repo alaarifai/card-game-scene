@@ -358,6 +358,9 @@ int main()
         std::cerr << "Card sound file not found: " << cardSoundPath << std::endl;
 
     bool gWasPressed = false;
+    bool tWasPressed = false;
+    int inspectedCard = -1;          // id of the card brought close (-1 = none)
+    vec3 inspectedHome(0.0f);        // where that card goes back to
     bool rWasPressed = false;
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
@@ -443,6 +446,44 @@ int main()
         }
         gWasPressed = gIsPressed;
 
+        bool tIsPressed = glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS;
+        if (cameraMode == 1 && inspectedCard != -1)
+        {
+            deck[inspectedCard].moveTo(inspectedHome);
+            inspectedCard = -1;
+        }
+
+        // T works only with the player camera (camera 2)
+        if (tIsPressed && !tWasPressed && cameraMode == 2)
+        {
+            if (inspectedCard != -1)
+            {
+                deck[inspectedCard].moveTo(inspectedHome);
+                inspectedCard = -1;
+            }
+            else
+            {
+                std::vector<int> candidates;
+                for (int i = 0; i < static_cast<int>(deck.size()); i++)
+                {
+                    bool stillInDeck = std::find(remainingCards.begin(), remainingCards.end(), i) != remainingCards.end();
+                    if (!stillInDeck && !deck[i].moving)
+                        candidates.push_back(i);
+                }
+
+                if (!candidates.empty())
+                {
+                    int id = candidates[std::rand() % static_cast<int>(candidates.size())];
+                    inspectedCard = id;
+                    inspectedHome = deck[id].targetPosition;
+
+                    vec3 closeUp = vec3(0.0f, 3.7f, 7.9f);
+                    deck[id].moveTo(closeUp);
+                }
+            }
+        }
+        tWasPressed = tIsPressed;
+
         glClearColor(0.12f, 0.14f, 0.18f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         sceneShader.use();
@@ -465,7 +506,7 @@ int main()
         else
         {
 
-            view = lookAt(vec3(0.0f, 6.0f, 11.0f),
+            view = lookAt(vec3(0.0f, 6.5f, 12.5f),
                           vec3(0.0f, 0.5f, -1.0f),
                           vec3(0.0f, 1.0f, 0.0f));
         }
