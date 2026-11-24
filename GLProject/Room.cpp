@@ -1,5 +1,6 @@
 #include "Room.h"
 #include "tools/TextureLoader.h"
+#include "tools/Box.h"
 
 #include <glm/glm.hpp>
 #include <iostream>
@@ -9,6 +10,10 @@
 // Room data lives here (file-level), so main only calls buildRoom/drawRoom
 static std::vector<GLuint> roomTextures;            // [0] = floor, [1] = wallpaper
 static std::vector<PolygonWithTexture*> roomParts;  // floor, 4 walls, ceiling
+
+// The table: one top slab + 4 legs (all built from Box), with its own textures
+static std::vector<GLuint> tableTextures;           // [0] = green felt (top), [1] = dark wood (legs)
+static std::vector<Box*> tableParts;                // top, then 4 legs
 
 // Room limits (same numbers as the contract): x,z in [-15, 15], floor y = -3, ceiling y = 9
 static const float ROOM = 15.0f;
@@ -72,6 +77,48 @@ void buildRoom()
         },
         { glm::vec2(0.0f, 5.0f), glm::vec2(5.0f, 5.0f), glm::vec2(5.0f, 0.0f), glm::vec2(0.0f, 0.0f) },
         roomTextures[1]);
+
+    // 5. The table (contract: 12 x 8, top surface at y = 0).
+    //    Top slab is 0.3 thick, so its center is at y = -0.15 and its size is (12, 0.3, 8).
+    std::vector<std::string> tablePaths = { "textures/table_felt.jpg", "textures/table_wood.jpg" };
+    tableTextures = loadTextures(tablePaths, GL_REPEAT, GL_LINEAR);
+    if (tableTextures.size() != tablePaths.size())
+    {
+        std::cerr << "Room: table textures failed to load" << std::endl;
+        return;
+    }
+    // Small helper so each table piece is one short line: (center, size, texture index)
+    auto addBox = [](glm::vec3 center, glm::vec3 size, int tex)
+    {
+        tableParts.push_back(new Box(center, size, tableTextures[tex]));
+    };
+    const int FELT = 0, WOOD = 1;
+
+    // Felt: the playing surface. Its top is exactly y = 0 (the contract), size 12 x 8.
+    addBox(glm::vec3(0.0f, -0.15f, 0.0f), glm::vec3(12.0f, 0.3f, 8.0f), FELT);
+
+    // Wooden frame around the felt (4 bars, 0.4 wide). Slightly higher (+0.06) so the felt looks sunk inside it.
+    addBox(glm::vec3(0.0f, -0.12f,  4.2f), glm::vec3(12.8f, 0.36f, 0.4f), WOOD);   // near the player
+    addBox(glm::vec3(0.0f, -0.12f, -4.2f), glm::vec3(12.8f, 0.36f, 0.4f), WOOD);   // far side
+    addBox(glm::vec3( 6.2f, -0.12f, 0.0f), glm::vec3(0.4f, 0.36f, 8.0f), WOOD);    // right
+    addBox(glm::vec3(-6.2f, -0.12f, 0.0f), glm::vec3(0.4f, 0.36f, 8.0f), WOOD);    // left
+
+    // Wooden skirt (apron) under the top, between the legs
+    addBox(glm::vec3(0.0f, -0.6f,  4.0f), glm::vec3(11.5f, 0.6f, 0.25f), WOOD);
+    addBox(glm::vec3(0.0f, -0.6f, -4.0f), glm::vec3(11.5f, 0.6f, 0.25f), WOOD);
+    addBox(glm::vec3( 6.0f, -0.6f, 0.0f), glm::vec3(0.25f, 0.6f, 7.5f), WOOD);
+    addBox(glm::vec3(-6.0f, -0.6f, 0.0f), glm::vec3(0.25f, 0.6f, 7.5f), WOOD);
+
+    // 4 legs from under the slab (y = -0.3) down to the floor (y = -3): height 2.7, center y = -1.65.
+    // Each leg also gets a wider block at the top and a wider foot at the bottom, like the reference picture.
+    for (int sx = -1; sx <= 1; sx += 2)
+        for (int sz = -1; sz <= 1; sz += 2)
+        {
+            float x = sx * 6.0f, z = sz * 4.0f;
+            addBox(glm::vec3(x, -1.65f, z),   glm::vec3(0.5f, 2.7f, 0.5f),   WOOD);  // leg
+            addBox(glm::vec3(x, -0.85f, z),   glm::vec3(0.7f, 0.3f, 0.7f),   WOOD);  // top block
+            addBox(glm::vec3(x, -2.85f, z),   glm::vec3(0.7f, 0.3f, 0.7f),   WOOD);  // foot
+        }
 }
 
 void drawRoom(Shader& shader)
@@ -81,6 +128,10 @@ void drawRoom(Shader& shader)
     // Floor and walls first (the ceiling is always the LAST part)
     for (size_t i = 0; i + 1 < roomParts.size(); i++)
         roomParts[i]->draw(shader);
+
+    // The table (top + 4 legs), drawn before the ceiling
+    for (Box* part : tableParts)
+        part->draw(shader);
 
     // Ceiling: culled when seen from above, so the top camera can see the table through it
     if (!roomParts.empty())
@@ -100,5 +151,12 @@ void destroyRoom()
         delete part;
     }
     roomParts.clear();
+    for (Box* part : tableParts)
+    {
+        part->destroy();
+        delete part;
+    }
+    tableParts.clear();
+    glDeleteTextures(static_cast<GLsizei>(tableTextures.size()), tableTextures.data());
     glDeleteTextures(static_cast<GLsizei>(roomTextures.size()), roomTextures.data());
 }
