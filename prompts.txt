@@ -1,0 +1,1068 @@
+
+================================================================================
+       PROMPTS LOG - COMPUTER GRAPHICS ASSIGNMENT
+                  "CARD GAME SCENE" (OPENGL / C++)
+================================================================================
+
+Team member 1 ........ hamza raweh
+Role .................. A: Room, Table, Poster, Decorations
+
+Team member 2 ........ alaarifai
+Role .................. B: Cards, Cameras, G Key, Animation
+
+Repository ............ github.com/alaarifai/card-game-scene
+
+AI tools .............. ChatGPT (OpenAI) / Claude (Anthropic)
+Period ................ 22-24 November 2026
+
+Note:
+The original prompts and discussions were written in Arabic.
+They are documented here in English, translated and edited for clarity.
+
+This document combines the contributions of both team members and
+records the AI-assisted development process in chronological order.
+
+The prompts are organized by development phase and team responsibility.
+The original technical decisions, debugging cases, and verification
+results are preserved.
+
+
+--------------------------------------------------------------------------------
+1. APPROACH
+--------------------------------------------------------------------------------
+
+The project was developed through a two-person collaboration.
+The responsibilities were divided into two main systems:
+
+  Role A - hamza raweh:
+    Room environment, floor, walls, ceiling, table, table zones,
+    poster, and decorative objects.
+
+  Role B - alaarifai:
+    Playing cards, card class, cameras, keyboard interaction,
+    card movement, and animation.
+
+The development process followed these principles:
+
+  1. Planning:
+     Define the project requirements, divide responsibilities,
+     establish shared scene coordinates and technical conventions.
+
+  2. Understanding:
+     Study the lecture code and understand the concepts before
+     implementing new functionality.
+
+  3. Implementation:
+     Work on small, independent tasks (A1-A9 and B1-B9).
+
+  4. Collaboration:
+     Maintain shared technical constants and coordinate integration
+     between the two development roles.
+
+  5. Debugging:
+     Investigate compilation, linking, rendering, texture, and
+     camera-related problems.
+
+  6. Verification:
+     Build and run the application and compare actual results
+     with the expected scene.
+
+  7. Documentation:
+     Record implementation decisions, important problems,
+     and the concepts learned during development.
+
+The main principle was to understand every important implementation
+decision instead of simply accepting AI-generated code.
+
+
+--------------------------------------------------------------------------------
+2. PROMPTS
+--------------------------------------------------------------------------------
+
+=== Phase 1 - Requirements Analysis and Planning (22 Nov) ======================
+
+[01] (Both members - assignment brief)
+
+     Break down the assignment requirements and identify the main
+     implementation tasks, grading criteria, and possible risks.
+
+     -> Divided the project into two systems: Role A (world) and
+        Role B (gameplay).
+
+     -> Identified grading considerations, including visual quality,
+        understanding, GitHub history, and decoration similarity.
+
+[02] (Both members - lecture slides)
+
+     Review the computer graphics lectures and identify the concepts
+     required for the project.
+
+     -> Connected the project implementation to the university
+        lectures and their C++/OpenGL examples.
+
+[03] (Both members - shared project design)
+
+     Establish a shared technical contract containing scene dimensions,
+     coordinates, camera positions, table dimensions, and card positions.
+
+     -> Defined common values to ensure that both implementations
+        work together correctly.
+
+[04] (Both members - project structure)
+
+     Organize the project structure and establish a clear separation
+     between shared tools and individual components.
+
+     -> Defined the responsibilities of each team member and
+        the shared resources required by both systems.
+
+[05] (Both members - lecture 5 slides)
+
+     Summarize the lighting model in lecture 5, including ambient,
+     diffuse, and specular lighting, and compare Phong and Blinn-Phong.
+
+     Determine whether the assignment requires implementing lighting.
+
+     -> Lighting was not required, so it was kept as optional polish
+        after the main features were completed.
+
+[06] (Both members - lecture code L2-L5)
+
+     Audit the lecture code and map each lecture to the project features.
+     Identify possible implementation problems.
+
+     -> Identified important issues:
+
+        - Texture loader assumed RGB images.
+        - Texture parameters could be set before binding.
+        - Held-key input could trigger repeatedly every frame.
+        - Mouse-driven camera behavior was unsuitable.
+        - CMake compiled every .cpp file, requiring one entry point.
+
+
+=== Phase 2 - Repository and Architecture Setup (22-23 Nov) ===================
+
+[07] (S1 - repository setup)
+
+     Ask what to do first and how to create the repository with the
+     lecture 5 project as the first commit.
+
+     -> Established the lecture project as the initial baseline.
+
+     -> This separates the original lecture code from the team's
+        own implementation in the Git history.
+
+[08] (Cloning and collaboration)
+
+     Explain how to clone the teammate's repository and work as
+     a collaborator.
+
+     Explain why a push may be rejected.
+
+     -> Learned GitHub Desktop cloning, collaborator invitations,
+        and the importance of committing with the correct account.
+
+[09] (S2 - single entry point)
+
+     Explain the purpose of the new main file and why the project
+     must contain only one main() function.
+
+     -> CMake builds every .cpp file in the project.
+        Multiple main() functions can cause a multiple-definition
+        linker error.
+
+[10] (Architecture review)
+
+     Explain the project structure, the new entry point, the lecture
+     demo files, and the shared tools.
+
+     -> Lecture demos were kept inside reference/ instead of being
+        compiled with the main application.
+
+[11] (CMake configuration)
+
+     Diagnose a CMake configure failure after moving the project.
+
+     -> Identified a stale build cache pointing to the previous path.
+        The build directory was regenerated.
+
+[12] (File organization)
+
+     Diagnose a build failure after moving files out of GLProject/.
+
+     -> CMake file globbing is evaluated during configuration.
+        Reconfiguration was required to detect the moved files.
+
+[13] (Git synchronization)
+
+     Analyze a difference between the local working copy and origin/main.
+
+     -> Identified duplicated work in the local copy and resolved
+        the synchronization issue by discarding the duplicate and
+        pulling the correct repository state.
+
+[14] (Assignment cross-check)
+
+     Compare the assignment PDF with the production document.
+
+     -> Mapped assignment requirements to implementation tasks
+        and reviewed deadlines and the similarity requirement.
+
+
+=== Phase 3 - Lecture Study and Shared Technical Tools (22-23 Nov) =============
+
+[15] (Lecture 4 - textures)
+
+     Explain whether the lectures must be studied completely and
+     provide a page-by-page walkthrough of lecture 4.
+
+     -> Studied:
+
+        - UV coordinates.
+        - GL_REPEAT and texture wrapping.
+        - GL_CLAMP.
+        - Texture filtering.
+        - Mipmaps.
+        - Texture loading order.
+
+[16] (S3 - texture loader)
+
+     Explain the S3 requirements and clarify whether a new texture
+     loader must be implemented.
+
+     -> Identified the need for a reusable texture-loading function
+        that supports RGBA images, instead of assuming three channels.
+
+[17] (S3 - verification and fixes)
+
+     Inspect the project and check whether S3 is complete.
+     Test transparency using an image.
+
+     -> Identified and fixed:
+
+        - Missing image flipping.
+        - Missing alpha discard.
+        - Missing transparent test images.
+
+     -> Tested the implementation using a transparent PNG.
+        The torn corner became visible correctly.
+
+     Commit:
+     feat: add fixed texture loader, unlit scene shader, textures
+
+[18] (Texture loader review)
+
+     Explain how the texture loader, shaders, and model matrix
+     work together in the rendering process.
+
+     -> Established four important questions for each frame:
+
+        Shape, texture, model matrix, and camera.
+
+
+=== Phase 4 - Role A Implementation: Room and Environment (23-24 Nov) =========
+
+Team member: hamza raweh
+
+[19] A1 - Wooden Floor
+
+     Create a textured floor polygon covering the room from -15 to +15
+     on the X and Z axes, positioned at Y = -3.
+
+     Explain texture coordinates and texture repetition.
+
+     -> Completion criterion: The wooden texture repeats correctly
+        without stretching.
+
+     -> Learned why UV coordinates extend beyond the range 0..1
+        when GL_REPEAT is used.
+
+     -> Used repeated texture coordinates to create approximately
+        10 x 10 texture tiles instead of stretching one image.
+
+     Commit:
+     feat(room): wooden floor with repeated texture
+
+[20] (Build tool configuration)
+
+     Explain the VS Code CMake prompt:
+     "Add Room.h to which target?"
+
+     -> Selected GLProject.
+
+     -> Reviewed how CMakeLists.txt uses file(GLOB ...) to detect
+        source files after reconfiguration.
+
+[21] (Texture design decisions)
+
+     Discuss where the visual assets should come from and whether
+     additional objects such as a carpet should be added.
+
+     -> Decided to use seamless textures.
+
+     -> Avoided adding repeated decorative elements that could
+        negatively affect the visual originality of the project.
+
+     -> Kept the floor and wallpaper textures flat and tileable.
+
+[22] A2 - Walls and Ceiling
+
+     Create four textured walls and a ceiling positioned at Y = 9.
+
+     Use the same texturing concept as the floor, but correctly
+     orient the polygons and texture coordinates.
+
+     -> Walls use UV repetition of approximately 5 x 2.
+
+     -> Completion criterion: The room is enclosed and visible
+        from camera 2.
+
+     Commit:
+     feat(room): wallpaper walls and ceiling
+
+[23] (Crash debugging - white window)
+
+     Investigate why the application displays a white window
+     and crashes.
+
+     Use the actual Windows crash log instead of guessing object
+     positions or coordinates.
+
+     -> Root cause: The graphics driver crashed when processing
+        odd-width RGB images because of the default pixel unpack
+        alignment.
+
+     -> Fixed using:
+
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+     Commit:
+     fix(textures): set unpack alignment for odd-width images
+
+[24] (Camera 1 and ceiling visibility)
+
+     Explain why camera 1 shows only the wallpaper.
+
+     Investigate the camera position and ceiling geometry.
+
+     -> Camera 1 is positioned at Y = 11, above the ceiling at Y = 9.
+
+     -> The camera was seeing the back of the ceiling.
+
+     -> Fixed the ceiling winding and used face culling to prevent
+        the ceiling from blocking the top camera view.
+
+     -> Confirmed that the application must run from the build
+        directory because CMake copies the assets there.
+
+     Commit:
+     fix(room): hide ceiling from top camera
+
+[25] A3 - Reusable Textured Box
+
+     Explain the idea of a reusable textured box before implementing it.
+
+     Create a function that draws a textured box at any specified
+     center and size.
+
+     Explain scaling and translation using a unit cube.
+
+     -> A box consists of six textured faces.
+
+     -> The unit cube is scaled and then translated using:
+
+        Model = T * S
+
+     -> Two boxes with different dimensions were created using
+        the same implementation.
+
+     Commit:
+     feat(tools): reusable textured box
+
+[26] A4 - Table with Legs
+
+     Create a table with the following specifications:
+
+       Table surface: 12 x 8
+       Thickness: 0.3
+       Four legs extending towards the floor
+       Table center: Room center
+       Surface height: Y = 0
+
+     Explain transformation order and the relationship between
+     scaling and translation.
+
+     -> Completion criterion: A properly positioned table
+        with four legs.
+
+     Commit:
+     feat(room): table with legs
+
+[27] A5 - Three Table Zones
+
+     Create three visually distinguishable zones:
+
+       - Player's played-card area
+       - Opponent's area
+       - Deck area
+
+     Raise the zone surfaces slightly above the table to prevent
+     depth conflicts.
+
+     -> Completion criterion: All three zones are clearly visible
+        from both cameras.
+
+     Commit:
+     feat(room): three table zones
+
+[28] A6 - Poster on the Back Wall
+
+     Add a decorative poster to the back wall.
+
+     Position it according to the shared scene coordinates.
+
+     -> Completion criterion: The poster is correctly positioned
+        and visible in the room.
+
+     Commit:
+     feat(room): poster on back wall
+
+[29] A7 - Torn Poster with Alpha Discard
+
+     Create a torn poster effect using transparency.
+
+     Explain how the fragment shader discards transparent pixels
+     and why discard is suitable for this effect.
+
+     -> Completion criterion: Parts of the poster are missing,
+        allowing the wall behind it to remain visible.
+
+     Commit:
+     feat(room): torn poster with alpha discard
+
+[30] A8 - Decorative Object 1
+
+     Create a rare decorative object using combinations of simple
+     textured boxes.
+
+     Possible examples include a chess table or a treasure chest.
+
+     -> Completion criterion: The first decorative object is
+        positioned according to the shared technical contract.
+
+     Commit:
+     feat(decor): piece 1
+
+[31] A9 - Decorative Object 2
+
+     Create a second rare decorative object using the reusable
+     textured box implementation.
+
+     -> Completion criterion: The second decorative object is
+        correctly positioned according to the shared contract.
+
+     Commit:
+     feat(decor): piece 2
+
+
+=== Phase 5 - Role B Implementation: Cards and Gameplay (22-23 Nov) ===========
+
+Team member: alaarifai
+
+[32] B1 - First Playing Card
+
+     Render the first card as a textured quad.
+
+     Use a pivot on the near edge and map UV coordinates so that
+     the image remains upright when the card stands.
+
+     -> First card rendered at the deck position.
+
+[33] B2 - Card Class and Five-Card Deck
+
+     Refactor the implementation into a Card class using separate
+     header and source files.
+
+     Create a five-card deck with local-space offsets.
+
+     -> Reusable card objects and a complete deck.
+
+[34] B3 - Two Fixed Cameras
+
+     Implement two fixed cameras controlled by keys 1 and 2.
+
+     Explain lookAt parameters and why the top camera cannot use
+     an up vector parallel to its viewing direction.
+
+     -> Two working camera views.
+
+     -> The top camera uses:
+
+        up = (0, 0, -1)
+
+[35] B4 - Standing and Laying Cards
+
+     Make cards stand in camera 2 and lie flat in camera 1.
+
+     Use a 90-degree rotation around the X axis.
+
+     -> Correct card orientation in both camera views.
+
+[36] (Repository review)
+
+     Audit the repository and build before continuing.
+
+     -> Reviewed formatting, compiler error visibility,
+        and pending changes.
+
+[37] (Card class compile error)
+
+     Diagnose the compile error:
+
+     "extra qualification Card::"
+
+     -> The definitions were placed inside the class body.
+        Moved the function definitions to Card.cpp.
+
+[38] (Camera 2 clipping)
+
+     Explain why the standing deck is clipped in camera 2.
+
+     -> Projected NDC x = +1.36, outside the valid range [-1, 1].
+
+     -> Reframed camera 2 to:
+
+        eye    = (0, 6, 11)
+        target = (0, 0.5, -1)
+
+     -> Confirmed that the important scene points were inside
+        the camera frustum.
+
+[39] B5 - Smooth Stand/Lay Animation
+
+     Implement frame-rate-independent rotation using deltaTime.
+
+     Use current and target angles and clamp the animation.
+
+     -> Smooth transition between standing and lying positions.
+
+[40] B6 - G Key Interaction
+
+     Implement single-press detection for the G key.
+
+     Select random cards without repetition from the remaining deck.
+
+     Calculate the next playing slot using:
+
+        nextSlot = -2.6 + 1.3 * n
+
+     Ignore the sixth press.
+
+     -> Each key press selects one available card.
+
+[41] B7 - Card Movement Animation
+
+     Animate the selected card towards the playing area.
+
+     Use normalized progress, interpolation, and smoothstep easing.
+
+     -> Smooth movement over 0.7 seconds.
+
+[42] B8 - Card Flight Arc
+
+     Add a vertical arc to the card movement.
+
+     Use:
+
+        yOffset = 0.8 * sin(pi * progress)
+
+     -> Cards follow a curved trajectory.
+
+[43] B9 - Edge Cases and Resizing
+
+     Review rapid key presses, camera switching during movement,
+     and window resizing.
+
+     -> Resize stretched the image.
+
+     -> Corrected the projection to use the live aspect ratio
+        with a zero-height guard.
+
+     Commit:
+     fix(camera): keep aspect ratio on window resize
+
+
+=== Phase 6 - Additional Role A Collaboration and Git Workflow (23-24 Nov) ===
+
+Team member: hamza raweh
+
+[44] (Task dependencies)
+
+     Ask which tasks of Role A depend on the teammate's work and
+     which can be implemented independently.
+
+     -> Role A (world) is mostly independent.
+
+     -> The shared integration points include CardGameMain.cpp
+        and the camera values.
+
+[45] (Git workflow decisions)
+
+     Ask whether each member should use a separate branch or work
+     directly on main.
+
+     Clarify who owns CardGameMain.cpp and how to test without pushing.
+
+     -> Kept file ownership from the production document.
+
+     -> Tested locally without committing the shared main file.
+
+     -> Used branch A for Role A work.
+
+[46] (Branch management)
+
+     Investigate why branch A was not visible on GitHub.
+
+     -> Identified that branch A existed locally but had not yet
+        been pushed.
+
+     -> Pushed branch A and continued Role A work on that branch.
+
+[47] (Project continuation)
+
+     Request a structured summary of the repository state, completed
+     tasks, discovered problems, and remaining work.
+
+     -> Prepared a continuation summary to preserve the development
+        context between sessions.
+
+
+=== Phase 7 - Shared Integration and Final Design (23-24 Nov) ================
+
+[48] (Shared technical contract)
+
+     Consolidate the team documents into one production document
+     containing exact scene coordinates.
+
+     Validate the camera positions and object dimensions.
+
+     -> Camera 1 was raised from Y = 10 to Y = 11.
+
+     -> The stacked card offset was moved into local space to
+        prevent z-fighting when cards stand vertically.
+
+[49] (Shared integration)
+
+     Analyze the relationship between both implementations and
+     verify that their shared scene coordinates match.
+
+     -> Reviewed room dimensions, table positions, card zones,
+        camera positions, and object visibility.
+
+[50] (Final build review)
+
+     Investigate compilation problems and verify that the room
+     and gameplay systems work together.
+
+     -> Reviewed the actual build output and application behavior.
+
+[51] (Visual asset generation)
+
+     Generate a vintage Arabian Nights poster.
+
+     -> Created visual material matching the artistic direction
+        of the room.
+
+[52] (Damascene wooden board texture)
+
+     Original prompt:
+
+     Top-down flat view of a Damascene inlaid wooden chess board,
+     mother-of-pearl and dark walnut squares, seamless, no pieces,
+     no shadows, square 1:1.
+
+[53] (Dark wooden treasure chest texture)
+
+     Original prompt:
+
+     Seamless dark carved wooden treasure chest texture with brass
+     bands, flat front view, no shadows, square 1:1.
+
+[54] (Additional visual assets)
+
+     Generate and improve additional visual assets.
+
+     -> Reviewed the generated results and requested improvements
+        to visual quality and artistic details.
+
+[55] (Card character theme)
+
+     Interpret the requirement of a fictional character favoured
+     by a team member and propose suitable theme options.
+
+     -> Selected an Arabian Nights character theme:
+
+        - Sindbad
+        - Aladdin
+        - Scheherazade
+        - Ali Baba
+        - Juha
+
+     -> Chosen to match the Damascene art direction of the scene.
+
+[56] (Card texture generation)
+
+     Produce five original card illustrations for the selected theme.
+
+     -> The first version was rejected and redesigned.
+        The improved version was accepted.
+
+[57] (Texture update problem)
+
+     Explain why updated textures do not appear at runtime.
+
+     -> Identified that the assets are copied by a POST_BUILD step
+        only when the executable is relinked.
+
+[58] (GitHub integration)
+
+     Open and merge the pull request from branch B into main.
+
+     -> PR #1: 12 commits, no conflicts.
+
+
+--------------------------------------------------------------------------------
+3. VERIFICATION OF AI OUTPUT
+--------------------------------------------------------------------------------
+
+All AI suggestions were treated as proposals and evaluated against
+the actual project implementation.
+
+Important verification cases included:
+
+  - Camera positioning:
+    The initial camera 2 position caused the standing deck to be
+    clipped. The camera was reframed after checking projected
+    coordinates.
+
+  - Camera 1 height:
+    The original height was increased from Y = 10 to Y = 11 after
+    checking the field of view against the table dimensions.
+
+  - Card stacking:
+    The card offset was moved into local space to prevent z-fighting
+    when cards stand vertically.
+
+  - Shader loading:
+    Incorrect runtime paths were investigated and corrected.
+    The image appeared after the paths were fixed.
+
+  - Texture loading:
+    The texture loader was reviewed to support RGBA images,
+    image flipping, and transparent textures.
+
+  - White window crash:
+    The actual Windows crash log was examined.
+    The problem was traced to pixel unpack alignment for
+    odd-width RGB images.
+
+    The fix was:
+
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+  - Ceiling visibility:
+    Camera 1 was above the ceiling, which blocked the top view.
+    The ceiling winding and face-culling behavior were corrected.
+
+  - Runtime working directory:
+    The program needed to run from the build directory because
+    CMake copied the required assets there.
+
+  - Window resizing:
+    The projection aspect ratio was updated to prevent image stretching.
+
+  - Texture updates:
+    Updated assets did not appear until the executable was relinked
+    because of the POST_BUILD asset-copy step.
+
+  - Visual assets:
+    Generated images were reviewed and improved when necessary.
+
+  - Card illustrations:
+    The first version was rejected and redesigned before acceptance.
+
+  - Integration:
+    Shared coordinates and object positions were checked to ensure
+    compatibility between Role A and Role B.
+
+
+--------------------------------------------------------------------------------
+4. LESSONS LEARNED
+--------------------------------------------------------------------------------
+
+  - Dividing the project by system responsibilities makes
+    collaboration easier.
+
+  - Shared technical constants are important when different
+    team members implement connected systems.
+
+  - Understanding transformation order is essential for positioning
+    and scaling objects correctly.
+
+  - The transformation T * S scales an object first and then
+    moves it to its required position.
+
+  - Texture coordinates must be designed carefully to avoid
+    stretching and incorrect orientation.
+
+  - UV coordinates outside the range 0..1 can be used with
+    GL_REPEAT to repeat textures.
+
+  - Transparent textures require appropriate image loading
+    and fragment shader handling.
+
+  - Odd image widths may require GL_UNPACK_ALIGNMENT = 1.
+
+  - Camera positioning and projection must be verified using
+    actual scene dimensions.
+
+  - An object between the camera and the scene can block the view
+    and may require face culling or corrected geometry winding.
+
+  - Local-space transformations are useful when an object must
+    maintain its relative geometry during rotation.
+
+  - deltaTime makes animations independent of frame rate.
+
+  - Interpolation and smoothstep produce smoother movement.
+
+  - Build errors, linker errors, and runtime errors must be
+    investigated separately.
+
+  - Relative file paths depend on the application's working directory.
+
+  - Updated assets may require rebuilding or relinking depending
+    on the CMake asset-copy configuration.
+
+  - Small implementation steps make debugging and code review easier.
+
+  - AI suggestions should always be tested against the actual
+    application.
+
+  - Understanding the reasoning behind every important line makes
+    it easier to explain and maintain the final implementation.
+
+
+--------------------------------------------------------------------------------
+5. TEAM ROLES AND FILE OWNERSHIP
+--------------------------------------------------------------------------------
+
+ROLE A - hamza raweh
+
+  Main responsibilities:
+    - Room environment
+    - Wooden floor
+    - Walls and ceiling
+    - Reusable textured box
+    - Gaming table
+    - Three table zones
+    - Wall poster
+    - Torn poster effect
+    - Decorative objects
+    - Room texture integration
+
+  Main task sequence:
+    A1 -> A2 -> A3 -> A4 -> A5 -> A6 -> A7 -> A8 -> A9
+
+  Git branch:
+    A
+
+
+ROLE B - alaarifai
+
+  Main responsibilities:
+    - Card rendering
+    - Card class
+    - Five-card deck
+    - Camera 1 and camera 2
+    - Card orientation
+    - Stand/lay animation
+    - G key interaction
+    - Random card selection
+    - Card movement
+    - Flight arc
+
+  Main task sequence:
+    B1 -> B2 -> B3 -> B4 -> B5 -> B6 -> B7 -> B8 -> B9
+
+  Git branch:
+    B
+
+
+SHARED RESPONSIBILITIES:
+
+  - Project architecture
+  - Shared scene coordinates
+  - Texture loading
+  - Shader integration
+  - Build verification
+  - Final scene integration
+
+
+--------------------------------------------------------------------------------
+6. GITHUB AND COMMIT METHODOLOGY
+--------------------------------------------------------------------------------
+
+The project followed a small-commit development approach.
+
+Commit message format:
+
+  type(scope): short description
+
+ROLE A COMMIT EXAMPLES:
+
+  feat: add fixed texture loader, unlit scene shader, textures
+  feat(room): wooden floor with repeated texture
+  fix(textures): set unpack alignment for odd-width images
+  feat(room): wallpaper walls and ceiling
+  fix(room): hide ceiling from top camera
+  feat(tools): reusable textured box
+  feat(room): table with legs
+  feat(room): three table zones
+  feat(room): poster on back wall
+  feat(room): torn poster with alpha discard
+  feat(decor): piece 1
+  feat(decor): piece 2
+
+ROLE B COMMIT EXAMPLES:
+
+  feat(cards): first card on table with top camera
+  feat(cards): Card class and five-card deck stack
+  feat(camera): fixed top and player cameras
+  chore: re-enable C++ error squiggles
+  feat(cards): stand/lay with camera
+  fix(camera): reframe player camera to show deck and full table
+  feat(cards): animated stand/lay rotation
+  feat(cards): G plays random card
+  feat(cards): animated move to play zone
+  feat(cards): card flight arc
+  fix(camera): keep aspect ratio on window resize
+  assets: add 5 Arabian Nights character cards
+
+GENERAL GIT WORKFLOW:
+
+  1. Fetch and pull the latest changes.
+  2. Work on the files assigned to each team member.
+  3. Commit after each completed implementation step.
+  4. Push changes to the corresponding feature branch.
+  5. Integrate the changes through a pull request.
+  6. Build and verify the integrated project.
+
+
+--------------------------------------------------------------------------------
+7. TOOLS AND TECHNOLOGIES
+--------------------------------------------------------------------------------
+
+  Programming Language ........ C++
+  Graphics API ................ OpenGL
+  Window Management ........... GLFW
+  OpenGL Loader ............... GLAD
+  Build System ................ CMake
+  Compiler .................... MinGW / G++
+  Development Environment ..... Visual Studio Code
+  Version Control ............. Git / GitHub
+  AI Tools .................... ChatGPT / Claude
+  Image Generation ............ OpenAI Image Generation
+  Operating System ............ Windows
+
+
+--------------------------------------------------------------------------------
+8. CONCEPTS COVERED
+--------------------------------------------------------------------------------
+
+GRAPHICS FUNDAMENTALS
+
+  - Rendering loop and double buffering
+  - glClear and glfwSwapBuffers
+  - Programmable graphics pipeline
+  - Vertex shaders and fragment shaders
+  - Model, view, and projection matrices
+  - Perspective projection
+  - Camera and lookAt
+  - Texture mapping and UV coordinates
+  - Texture repetition and filtering
+  - RGB and RGBA image formats
+  - Alpha discard
+  - Depth testing and z-fighting
+
+TRANSFORMATIONS
+
+  - Translation
+  - Rotation
+  - Scaling
+  - Transformation order
+  - Local-space and world-space coordinates
+  - Rotation around a pivot
+  - T * S transformation order
+
+CAMERAS AND PROJECTION
+
+  - Camera eye, target, and up vectors
+  - Camera orientation
+  - Field of view
+  - Aspect ratio
+  - View frustum
+  - Normalized Device Coordinates (NDC)
+  - Face culling and polygon winding
+
+TEXTURES AND SHADERS
+
+  - Texture loading
+  - Texture parameters
+  - GL_REPEAT and GL_CLAMP
+  - Texture filtering
+  - Image flipping
+  - Pixel unpack alignment
+  - Transparent PNG images
+  - Fragment shader discard
+  - Unlit shaders
+
+ANIMATION AND INPUT
+
+  - deltaTime
+  - Frame-rate-independent animation
+  - Keyboard input
+  - Single-press edge detection
+  - Random selection without repetition
+  - Linear interpolation
+  - Smoothstep easing
+  - Sinusoidal flight arc
+
+C++ AND PROJECT STRUCTURE
+
+  - Classes and objects
+  - Header and source files
+  - Functions and parameters
+  - Reusable drawing functions
+  - Texture loading functions
+  - Shader management
+  - File paths and working directories
+
+BUILD AND COLLABORATION
+
+  - CMake configuration
+  - Compilation and linking
+  - MinGW compiler
+  - POST_BUILD asset copying
+  - Runtime debugging
+  - Git branches
+  - Small focused commits
+  - Pull requests
+  - Shared technical contracts
+  - Incremental integration
+
+
+================================================================================
+                         END OF PROMPTS LOG
+================================================================================
+
