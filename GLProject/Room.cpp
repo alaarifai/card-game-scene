@@ -1,6 +1,8 @@
 #include "Room.h"
 #include "tools/TextureLoader.h"
 #include "tools/Box.h"
+#include <learnopengl/model.h>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <glm/glm.hpp>
 #include <iostream>
@@ -29,6 +31,8 @@ static std::vector<GLuint> decorTextures;            // [0] = chessboard picture
 static std::vector<Box*> decorParts;                 // table top, legs, stools
 static PolygonWithTexture* chessBoard = nullptr;     // the board picture, lying on the table top
 static std::vector<GLuint> chestTexture;             // decor piece 2: treasure chest picture (the box faces show it)
+static Model* decorModel = nullptr;                  // decor piece 3: the ONE 3D model (loaded with Assimp)
+static glm::mat4 decorModelMatrix(1.0f);             // places it at (-12, -3, 8) with a sensible size
 
 // Room limits (same numbers as the contract): x,z in [-15, 15], floor y = -3, ceiling y = 9
 static const float ROOM = 15.0f;
@@ -263,6 +267,32 @@ void buildRoom()
     // body: 1.0 tall sitting on the floor (center y = -3 + 0.5); lid: 0.5 tall on top (center y = -2 + 0.25)
     decorParts.push_back(new Box(glm::vec3(10.0f, FLOOR_Y + 0.5f, -10.0f), glm::vec3(2.4f, 1.0f, 1.6f), chestTexture[0]));
     decorParts.push_back(new Box(glm::vec3(10.0f, FLOOR_Y + 1.25f, -10.0f), glm::vec3(2.5f, 0.5f, 1.7f), chestTexture[0]));
+
+    // 10. Decor piece 3: the single 3D model, at (-12, -3, 8) (contract position 3).
+    //     We don't know its size in advance, so we measure its bounding box (min/max of all vertices) and then:
+    //     move it so its bottom center is the origin, scale so its biggest side is 3 units, move to the contract spot.
+    //     Matrix = T(place) * S(scale) * T(-bottom center): the LAST one written is applied FIRST.
+    decorModel = new Model("models/alrihla.glb");
+    if (decorModel->meshes.empty())
+    {
+        std::cerr << "Room: 3D model failed to load" << std::endl;
+        delete decorModel;
+        decorModel = nullptr;
+        return;
+    }
+    glm::vec3 mn(1e9f), mx(-1e9f);
+    for (const Mesh& mesh : decorModel->meshes)
+        for (const Vertex& v : mesh.vertices)
+        {
+            mn = glm::min(mn, v.Position);
+            mx = glm::max(mx, v.Position);
+        }
+    glm::vec3 size = mx - mn;
+    float s = 3.0f / glm::max(size.x, glm::max(size.y, size.z));
+    glm::vec3 bottomCenter((mn.x + mx.x) * 0.5f, mn.y, (mn.z + mx.z) * 0.5f);
+    decorModelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(-12.0f, FLOOR_Y, 8.0f))
+                     * glm::scale(glm::mat4(1.0f), glm::vec3(s))
+                     * glm::translate(glm::mat4(1.0f), -bottomCenter);
 }
 
 void drawRoom(Shader& shader)
@@ -286,6 +316,15 @@ void drawRoom(Shader& shader)
         part->draw(shader);
     if (chessBoard)
         chessBoard->draw(shader);
+
+    // Decor piece 3: the 3D model (its own meshes bind their own textures; white color = no tint)
+    if (decorModel)
+    {
+        shader.setVec3("objectColor", glm::vec3(1.0f));
+        shader.setMat4("model", decorModelMatrix);
+        decorModel->Draw(shader);
+        glActiveTexture(GL_TEXTURE0);
+    }
 
     // The poster on the back wall (shadow first, then the poster over it)
     if (posterShadow)
@@ -337,6 +376,8 @@ void destroyRoom()
     }
     glDeleteTextures(static_cast<GLsizei>(decorTextures.size()), decorTextures.data());
     glDeleteTextures(static_cast<GLsizei>(chestTexture.size()), chestTexture.data());
+    delete decorModel;                       // Model owns its meshes; deleting it frees them
+    decorModel = nullptr;
     if (posterShadow)
     {
         posterShadow->deleteBuffers();
