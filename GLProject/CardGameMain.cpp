@@ -3,6 +3,12 @@
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
+#include <cstdint>
+#include <cstring>
+#include <cmath>
+#include <algorithm>
+#include <iterator>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -30,16 +36,180 @@ int cameraMode = 1;
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
 
-// Build asset paths from the executable's folder, not from the terminal's working folder.
-static std::string getAssetPath(const std::string& relativePath)
+
+static std::string findAssetPath(const std::string& relativePath)
 {
+    std::vector<std::filesystem::path> candidates;
+    std::error_code pathError;
+    std::filesystem::path workingFolder = std::filesystem::current_path(pathError);
+
+    if (!pathError)
+    {
+
+        candidates.push_back(workingFolder / "GLProject" / relativePath);
+        candidates.push_back(workingFolder.parent_path() / "GLProject" / relativePath);
+        candidates.push_back(workingFolder / relativePath);
+    }
+
     char executablePath[MAX_PATH] = {};
     DWORD length = GetModuleFileNameA(NULL, executablePath, MAX_PATH);
+    if (length > 0 && length < MAX_PATH)
+    {
+        std::filesystem::path exeFolder = std::filesystem::path(executablePath).parent_path();
+        candidates.push_back(exeFolder / relativePath);
+    }
 
-    if (length == 0 || length >= MAX_PATH)
-        return relativePath;
+    std::error_code existsError;
+    for (const std::filesystem::path& candidate : candidates)
+    {
+        if (std::filesystem::exists(candidate, existsError) && !existsError)
+            return candidate.string();
+        existsError.clear();
+    }
 
-    return (std::filesystem::path(executablePath).parent_path() / relativePath).string();
+    if (length > 0 && length < MAX_PATH)
+        return (std::filesystem::path(executablePath).parent_path() / relativePath).string();
+    return relativePath;
+}
+
+static unsigned short readU16(const std::vector<unsigned char>& bytes, size_t offset)
+{
+    return static_cast<unsigned short>(bytes[offset]) |
+           (static_cast<unsigned short>(bytes[offset + 1]) << 8);
+}
+
+static unsigned int readU32(const std::vector<unsigned char>& bytes, size_t offset)
+{
+    return static_cast<unsigned int>(bytes[offset]) |
+           (static_cast<unsigned int>(bytes[offset + 1]) << 8) |
+           (static_cast<unsigned int>(bytes[offset + 2]) << 16) |
+           (static_cast<unsigned int>(bytes[offset + 3]) << 24);
+}
+
+static void writeU16(std::vector<unsigned char>& bytes, size_t offset, unsigned short value)
+{
+    bytes[offset] = static_cast<unsigned char>(value & 0xFF);
+    bytes[offset + 1] = static_cast<unsigned char>((value >> 8) & 0xFF);
+}
+
+
+
+static bool makeDistantRadioCopy(const std::string& sourcePath, const std::string& outputPath)
+{
+    std::ifstream input(sourcePath, std::ios::binary);
+    if (!input)
+        return false;
+
+    std::vector<unsigned char> bytes(
+        (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+
+    if (bytes.size() < 44 || std::memcmp(bytes.data(), "RIFF", 4) != 0 ||
+        std::memcmp(bytes.data() + 8, "WAVE", 4) != 0)
+        return false;
+
+    size_t formatOffset = 0;
+    size_t formatSize = 0;
+    size_t audioOffset = 0;
+    size_t audioSize = 0;
+
+    for (size_t offset = 12; offset + 8 <= bytes.size();)
+    {
+        unsigned int chunkSize = readU32(bytes, offset + 4);
+        size_t chunkData = offset + 8;
+        if (chunkData + chunkSize > bytes.size())
+            return false;
+
+        if (std::memcmp(bytes.data() + offset, "fmt ", 4) == 0)
+        {
+            formatOffset = chunkData;
+            formatSize = chunkSize;
+        }
+        else if (std::memcmp(bytes.data() + offset, "data", 4) == 0)
+        {
+            audioOffset = chunkData;
+            audioSize = chunkSize;
+            break;
+        }
+
+        offset = chunkData + chunkSize + (chunkSize & 1U);
+    }
+
+    if (formatOffset == 0 || formatSize < 16 || audioOffset == 0 || audioSize == 0)
+        return false;
+
+    const unsigned short audioFormat = readU16(bytes, formatOffset);
+    const unsigned short channels = readU16(bytes, formatOffset + 2);
+    const unsigned int sampleRate = readU32(bytes, formatOffset + 4);
+    const unsigned short bitsPerSample = readU16(bytes, formatOffset + 14);
+
+    if (audioFormat != 1 || (bitsPerSample != 8 && bitsPerSample != 16) ||
+        channels == 0 || channels > 2 || sampleRate == 0)
+        return false;
+
+    const size_t bytesPerSample = bitsPerSample / 8;
+    const size_t frameSize = bytesPerSample * channels;
+    const size_t frameCount = audioSize / frameSize;
+    if (frameCount == 0)
+        return false;
+
+    const float cutoffHz = 2100.0f;
+    const float alpha = 1.0f - std::exp(-2.0f * 3.14159265f * cutoffHz / sampleRate);
+    const size_t delayOne = std::max<size_t>(1, static_cast<size_t>(sampleRate * 0.028f));
+    const size_t delayTwo = std::max<size_t>(delayOne + 1, static_cast<size_t>(sampleRate * 0.058f));
+    const size_t ringFrames = delayTwo + 1;
+
+    std::vector<float> lowPass(channels, 0.0f);
+    std::vector<float> history(ringFrames * channels, 0.0f);
+
+    for (size_t frame = 0; frame < frameCount; ++frame)
+    {
+        const size_t currentSlot = frame % ringFrames;
+        const size_t oldOneSlot = (frame + ringFrames - delayOne) % ringFrames;
+        const size_t oldTwoSlot = (frame + ringFrames - delayTwo) % ringFrames;
+
+        for (unsigned short channel = 0; channel < channels; ++channel)
+        {
+            const size_t sampleOffset = audioOffset + frame * frameSize + channel * bytesPerSample;
+            float sample = 0.0f;
+
+            if (bitsPerSample == 16)
+            {
+                short signedSample = static_cast<short>(readU16(bytes, sampleOffset));
+                sample = static_cast<float>(signedSample) / 32768.0f;
+            }
+            else
+            {
+                sample = (static_cast<float>(bytes[sampleOffset]) - 128.0f) / 128.0f;
+            }
+
+            lowPass[channel] += alpha * (sample - lowPass[channel]);
+            const float echoOne = history[oldOneSlot * channels + channel];
+            const float echoTwo = history[oldTwoSlot * channels + channel];
+            history[currentSlot * channels + channel] = lowPass[channel];
+
+
+            const float distantSample = (0.80f * lowPass[channel] +
+                                         0.13f * echoOne + 0.07f * echoTwo) * 0.32f;
+            const float clipped = std::max(-1.0f, std::min(1.0f, distantSample));
+
+            if (bitsPerSample == 16)
+            {
+                short outputSample = static_cast<short>(clipped * 32767.0f);
+                writeU16(bytes, sampleOffset, static_cast<unsigned short>(outputSample));
+            }
+            else
+            {
+                int outputSample = static_cast<int>(clipped * 127.0f + 128.0f);
+                bytes[sampleOffset] = static_cast<unsigned char>(std::max(0, std::min(255, outputSample)));
+            }
+        }
+    }
+
+    std::ofstream output(outputPath, std::ios::binary | std::ios::trunc);
+    if (!output)
+        return false;
+    output.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    return output.good();
 }
 
 static void printMciError(MCIERROR error, const char* action)
@@ -92,7 +262,7 @@ int main()
     Shader sceneShader("./shaders/vs/scene.vs", "./shaders/fs/scene.fs");
     buildRoom();
 
-    // Load the five face textures and one shared back texture.
+
     std::vector<GLuint> cardTextures = loadTextures({
         "./textures/card0.jpg",
         "./textures/card1.jpg",
@@ -113,7 +283,7 @@ int main()
         return -1;
     }
 
-    // The felt surface is y = 0. A small positive offset keeps cards above it.
+
     const float CARD_Y = 0.03f;
     const vec3 deckPosition(4.0f, CARD_Y, 2.75f);
 
@@ -124,7 +294,7 @@ int main()
     std::vector<int> remainingCards = {0, 1, 2, 3, 4};
     int playedCount = 0;
 
-    // The opponent's five cards are face-down from the beginning.
+
     std::vector<Card> opponentCards;
     for (int i = 0; i < 5; i++)
     {
@@ -132,7 +302,7 @@ int main()
         opponentCards.push_back(Card(100 + i, backTextures[0], opponentPosition, 0.0f));
     }
 
-    // Extra decorative cards stay fixed on the left and right sides.
+
     std::vector<Card> sideCards;
     for (int i = 0; i < 3; i++)
     {
@@ -141,40 +311,47 @@ int main()
         sideCards.push_back(Card(210 + i, backTextures[0], vec3( 5.15f, CARD_Y, z), 0.0f));
     }
 
-    // Use paths beside GLProject.exe so playback works from VS Code and from a shortcut.
-    const std::string radioPath = getAssetPath("audio/radio.wav");
-    const std::string cardSoundPath = getAssetPath("audio/card_slide_better.wav");
+
+    const std::string radioPath = findAssetPath("audio/radio.wav");
+
+    const std::string radioDistantPath =
+        (std::filesystem::path(radioPath).parent_path() / "radio_distant.wav").string();
+    const std::string cardSoundPath = findAssetPath("audio/card_slide_better.wav");
 
     bool radioMciOpen = false;
     bool radioMciPlaying = false;
-    bool radioFallbackPlaying = false;
+    bool distantRadioCreated = false;
 
     std::error_code fileError;
     if (std::filesystem::exists(radioPath, fileError))
     {
-        // MCI plays the music independently, so card effects do not interrupt it.
+
+        distantRadioCreated = makeDistantRadioCopy(radioPath, radioDistantPath);
+        const std::string playbackPath = distantRadioCreated ? radioDistantPath : radioPath;
+
+        if (!distantRadioCreated)
+            std::cerr << "Could not make a distant copy (expected PCM 8/16-bit WAV). Playing original WAV." << std::endl;
+
         const std::string openRadioCommand =
-            "open \"" + radioPath + "\" type waveaudio alias radioTrack wait";
+            "open \"" + playbackPath + "\" type waveaudio alias radioTrack wait";
         MCIERROR radioError = mciSendStringA(openRadioCommand.c_str(), NULL, 0, NULL);
 
         if (radioError == 0)
         {
             radioMciOpen = true;
-            // MCI volume range is 0..1000. Keep the radio at a comfortable level.
-            mciSendStringA("setaudio radioTrack volume to 700", NULL, 0, NULL);
-            std::cout << "Radio file found: " << radioPath << std::endl;
-            std::cout << "Press R to play/stop the radio." << std::endl;
+            std::cout << "Radio ready: " << playbackPath << std::endl;
+            std::cout << "Press R to play/stop the distant radio." << std::endl;
         }
         else
         {
             printMciError(radioError, "open");
-            std::cerr << "Will try the Windows WAV playback fallback when R is pressed." << std::endl;
+            std::cerr << "Could not open radio.wav. Check that it is a normal WAV audio file." << std::endl;
         }
     }
     else
     {
         std::cerr << "Radio file not found: " << radioPath << std::endl;
-        std::cerr << "Keep radio.wav in the audio folder beside GLProject.exe." << std::endl;
+        std::cerr << "Keep radio.wav in GLProject/audio." << std::endl;
     }
 
     if (!std::filesystem::exists(cardSoundPath, fileError))
@@ -197,62 +374,57 @@ int main()
         bool gIsPressed = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
         bool rIsPressed = glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS;
 
-        // R toggles the radio. MCI is preferred because it can play alongside card sounds.
+
         if (rIsPressed && !rWasPressed)
         {
-            if (radioMciPlaying)
+            if (!radioMciOpen)
+            {
+                std::cerr << "Radio is not ready. Check GLProject/audio/radio.wav." << std::endl;
+            }
+            else if (radioMciPlaying)
             {
                 MCIERROR stopError = mciSendStringA("stop radioTrack", NULL, 0, NULL);
                 printMciError(stopError, "stop");
                 mciSendStringA("seek radioTrack to start", NULL, 0, NULL);
                 radioMciPlaying = false;
             }
-            else if (radioFallbackPlaying)
-            {
-                PlaySoundA(NULL, NULL, 0);
-                radioFallbackPlaying = false;
-            }
             else
             {
-                bool started = false;
 
-                if (radioMciOpen)
+                mciSendStringA("seek radioTrack to start", NULL, 0, NULL);
+                MCIERROR playError = mciSendStringA("play radioTrack", NULL, 0, NULL);
+                if (playError == 0)
+                    radioMciPlaying = true;
+                else
                 {
-                    MCIERROR playError = mciSendStringA("play radioTrack repeat", NULL, 0, NULL);
-                    if (playError == 0)
-                    {
-                        radioMciPlaying = true;
-                        started = true;
-                    }
-                    else
-                    {
-                        printMciError(playError, "play");
-                    }
-                }
-
-                // Fallback for WAV files/devices that MCI cannot open on this computer.
-                if (!started)
-                {
-                    BOOL soundStarted = PlaySoundA(
-                        radioPath.c_str(), NULL,
-                        SND_FILENAME | SND_ASYNC | SND_LOOP | SND_NODEFAULT);
-
-                    if (soundStarted)
-                    {
-                        radioFallbackPlaying = true;
-                        std::cout << "Radio playing with WAV fallback." << std::endl;
-                    }
-                    else
-                    {
-                        std::cerr << "Could not start radio. Check that audio/radio.wav is a standard WAV file." << std::endl;
-                    }
+                    radioMciPlaying = false;
+                    printMciError(playError, "play");
                 }
             }
         }
         rWasPressed = rIsPressed;
 
-        // Each G press deals one random remaining card into the player's row.
-        // After all five cards have been dealt, further presses do nothing.
+
+        if (radioMciPlaying)
+        {
+            char radioMode[32] = {};
+            MCIERROR statusError = mciSendStringA(
+                "status radioTrack mode", radioMode, sizeof(radioMode), NULL);
+
+            if (statusError == 0 && std::strcmp(radioMode, "stopped") == 0)
+            {
+                mciSendStringA("seek radioTrack to start", NULL, 0, NULL);
+                MCIERROR replayError = mciSendStringA("play radioTrack", NULL, 0, NULL);
+                if (replayError != 0)
+                {
+                    radioMciPlaying = false;
+                    printMciError(replayError, "replay");
+                }
+            }
+        }
+
+
+
         if (gIsPressed && !gWasPressed && !remainingCards.empty())
         {
             int randomIndex = std::rand() % static_cast<int>(remainingCards.size());
@@ -261,9 +433,12 @@ int main()
 
             deck[cardId].moveTo(vec3(-2.6f + 1.3f * playedCount, CARD_Y, 2.75f));
 
-            // Paper-slide sound is separate from the looping radio music.
-            PlaySoundA(cardSoundPath.c_str(), NULL,
-                       SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
+
+            if (!PlaySoundA(cardSoundPath.c_str(), NULL,
+                            SND_FILENAME | SND_ASYNC | SND_NODEFAULT))
+            {
+                std::cerr << "Could not play card sound: " << cardSoundPath << std::endl;
+            }
             playedCount++;
         }
         gWasPressed = gIsPressed;
@@ -282,14 +457,14 @@ int main()
         mat4 view;
         if (cameraMode == 1)
         {
-            // Camera 1: directly above the table; cards lie flat.
+
             view = lookAt(vec3(0.0f, 11.0f, 0.0f),
                           vec3(0.0f, 0.0f, 0.0f),
                           vec3(0.0f, 0.0f, -1.0f));
         }
         else
         {
-            // Camera 2: player's view; cards stand upright.
+
             view = lookAt(vec3(0.0f, 6.0f, 11.0f),
                           vec3(0.0f, 0.5f, -1.0f),
                           vec3(0.0f, 1.0f, 0.0f));
@@ -298,7 +473,7 @@ int main()
 
         drawRoom(sceneShader);
 
-        // Player deck / cards already dealt.
+
         for (Card &card : deck)
         {
             if (cameraMode == 2)
@@ -310,7 +485,7 @@ int main()
             card.draw(sceneShader);
         }
 
-        // Opponent cards remain face-down in both camera modes.
+
         for (Card &card : opponentCards)
         {
             if (cameraMode == 2)
@@ -322,14 +497,11 @@ int main()
             card.draw(sceneShader);
         }
 
-        // Decorative side cards also follow the two camera positions.
+
+
         for (Card &card : sideCards)
         {
-            if (cameraMode == 2)
-                card.stand();
-            else
-                card.lay();
-
+            card.lay();
             card.update(deltaTime);
             card.draw(sceneShader);
         }
@@ -338,13 +510,13 @@ int main()
         glfwPollEvents();
     }
 
-    if (radioMciPlaying || radioMciOpen)
-        mciSendStringA("stop radioTrack", NULL, 0, NULL);
     if (radioMciOpen)
+    {
+        mciSendStringA("stop radioTrack", NULL, 0, NULL);
         mciSendStringA("close radioTrack", NULL, 0, NULL);
-
-    if (radioFallbackPlaying)
-        PlaySoundA(NULL, NULL, 0);
+    }
+    if (distantRadioCreated)
+        std::filesystem::remove(radioDistantPath, fileError);
     PlaySoundA(NULL, NULL, 0);
     destroyRoom();
     glDeleteTextures(static_cast<GLsizei>(cardTextures.size()), cardTextures.data());
