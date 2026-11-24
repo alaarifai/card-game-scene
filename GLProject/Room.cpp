@@ -62,13 +62,15 @@ void buildRoom()
         { glm::vec3( ROOM, CEIL_Y, -ROOM), glm::vec3( ROOM, FLOOR_Y, -ROOM),
           glm::vec3( ROOM, FLOOR_Y,  ROOM), glm::vec3( ROOM, CEIL_Y,  ROOM) }, wallUV, roomTextures[1]);
 
-    // 4. Ceiling at y = 9, same wallpaper, tiled 5 x 5
+    // 4. Ceiling at y = 9, same wallpaper, tiled 5 x 5.
+    //    Corners are ordered counter-clockwise as seen from BELOW, so its front face points into the room.
+    //    This lets drawRoom hide it when the top camera (y = 11) looks down from above.
     addQuad(
         {
-            glm::vec3(-ROOM, CEIL_Y, -ROOM), glm::vec3(-ROOM, CEIL_Y,  ROOM),
-            glm::vec3( ROOM, CEIL_Y,  ROOM), glm::vec3( ROOM, CEIL_Y, -ROOM)
+            glm::vec3(-ROOM, CEIL_Y, -ROOM), glm::vec3( ROOM, CEIL_Y, -ROOM),
+            glm::vec3( ROOM, CEIL_Y,  ROOM), glm::vec3(-ROOM, CEIL_Y,  ROOM)
         },
-        { glm::vec2(0.0f, 5.0f), glm::vec2(0.0f, 0.0f), glm::vec2(5.0f, 0.0f), glm::vec2(5.0f, 5.0f) },
+        { glm::vec2(0.0f, 5.0f), glm::vec2(5.0f, 5.0f), glm::vec2(5.0f, 0.0f), glm::vec2(0.0f, 0.0f) },
         roomTextures[1]);
 }
 
@@ -76,8 +78,18 @@ void drawRoom(Shader& shader)
 {
     shader.setInt("textureSample", 0);
     glActiveTexture(GL_TEXTURE0);
-    for (PolygonWithTexture* part : roomParts)
-        part->draw(shader);
+    // Floor and walls first (the ceiling is always the LAST part)
+    for (size_t i = 0; i + 1 < roomParts.size(); i++)
+        roomParts[i]->draw(shader);
+
+    // Ceiling: culled when seen from above, so the top camera can see the table through it
+    if (!roomParts.empty())
+    {
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        roomParts.back()->draw(shader);
+        glDisable(GL_CULL_FACE);
+    }
 }
 
 void destroyRoom()
