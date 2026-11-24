@@ -24,6 +24,11 @@ static std::vector<GLuint> posterTexture;
 static PolygonWithTexture* posterPart = nullptr;
 static PolygonWithTexture* posterShadow = nullptr;   // same torn shape, dark and shifted: fake drop shadow
 
+// Decor pieces (built from boxes). Piece 1 = Damascene chess table at (-10, -3, -10)
+static std::vector<GLuint> decorTextures;            // [0] = chessboard picture
+static std::vector<Box*> decorParts;                 // table top, legs, stools
+static PolygonWithTexture* chessBoard = nullptr;     // the board picture, lying on the table top
+
 // Room limits (same numbers as the contract): x,z in [-15, 15], floor y = -3, ceiling y = 9
 static const float ROOM = 15.0f;
 static const float FLOOR_Y = -3.0f;
@@ -216,6 +221,35 @@ void buildRoom()
         { glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f) },
         glm::vec3(0.12f, 0.09f, 0.06f));
     posterShadow->setTexture(posterTexture[0]);
+
+    // 8. Decor piece 1: Damascene chess table, centered at (-10, -3, -10) (contract position 1).
+    //    Everything is a Box: scale first then translate, so each box is placed by its CENTER.
+    decorTextures = loadTextures({ "textures/decor_chessboard.png" }, GL_CLAMP_TO_EDGE, GL_LINEAR);
+    if (decorTextures.empty())
+    {
+        std::cerr << "Room: chessboard texture failed to load" << std::endl;
+        return;
+    }
+    const float CX = -10.0f, CZ = -10.0f;
+    const float LEG_H = 1.5f;                                   // legs go from the floor (-3) up to -1.5
+    const float TOP_Y = FLOOR_Y + LEG_H + 0.1f;                 // center of the 0.2 thick slab = -1.4
+    auto addDecor = [&](glm::vec3 center, glm::vec3 size)
+    {
+        decorParts.push_back(new Box(center, size, tableTextures[1]));   // dark wood, same as the game table
+    };
+    addDecor(glm::vec3(CX, TOP_Y, CZ), glm::vec3(3.4f, 0.2f, 3.4f));     // table top
+    for (int sx = -1; sx <= 1; sx += 2)
+        for (int sz = -1; sz <= 1; sz += 2)
+            addDecor(glm::vec3(CX + sx * 1.5f, FLOOR_Y + LEG_H / 2.0f, CZ + sz * 1.5f), glm::vec3(0.25f, LEG_H, 0.25f));
+    addDecor(glm::vec3(CX, FLOOR_Y + 0.45f, CZ + 2.6f), glm::vec3(1.0f, 0.9f, 1.0f));   // stool, player side
+    addDecor(glm::vec3(CX, FLOOR_Y + 0.45f, CZ - 2.6f), glm::vec3(1.0f, 0.9f, 1.0f));   // stool, wall side
+
+    // The board picture lies on the slab, 0.005 above its top face (same z-fighting trick as the zone frames)
+    const float BY = TOP_Y + 0.1f + 0.005f, B = 1.5f;           // half size of the board = 1.5
+    chessBoard = new PolygonWithTexture(
+        { glm::vec3(CX - B, BY, CZ + B), glm::vec3(CX + B, BY, CZ + B), glm::vec3(CX + B, BY, CZ - B), glm::vec3(CX - B, BY, CZ - B) },
+        { glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec2(0.0f, 1.0f) });
+    chessBoard->setTexture(decorTextures[0]);
 }
 
 void drawRoom(Shader& shader)
@@ -233,6 +267,12 @@ void drawRoom(Shader& shader)
     // The 3 zone frames, on top of the felt
     for (PolygonWithTexture* bar : zoneParts)
         bar->draw(shader);
+
+    // Decor: chess table (wood boxes) and the board picture on top
+    for (Box* part : decorParts)
+        part->draw(shader);
+    if (chessBoard)
+        chessBoard->draw(shader);
 
     // The poster on the back wall (shadow first, then the poster over it)
     if (posterShadow)
@@ -270,6 +310,19 @@ void destroyRoom()
         delete bar;
     }
     zoneParts.clear();
+    for (Box* part : decorParts)
+    {
+        part->destroy();
+        delete part;
+    }
+    decorParts.clear();
+    if (chessBoard)
+    {
+        chessBoard->deleteBuffers();
+        delete chessBoard;
+        chessBoard = nullptr;
+    }
+    glDeleteTextures(static_cast<GLsizei>(decorTextures.size()), decorTextures.data());
     if (posterShadow)
     {
         posterShadow->deleteBuffers();
