@@ -5,6 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <glm/glm.hpp>
+#include <cmath>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -33,6 +34,13 @@ static PolygonWithTexture* chessBoard = nullptr;     // the board picture, lying
 static std::vector<GLuint> chestTexture;             // decor piece 2: treasure chest picture (the box faces show it)
 static Model* decorModel = nullptr;                  // decor piece 3: the ONE 3D model (loaded with Assimp)
 static glm::mat4 decorModelMatrix(1.0f);             // places it at (-12, -3, 8) with a sensible size
+
+// Carpet + chairs + hanging lanterns (the "make it look professional" pass)
+static std::vector<GLuint> rugTexture;               // [0] = the carpet picture
+static PolygonWithTexture* rugPart = nullptr;        // the carpet, a flat quad on the floor
+static std::vector<Box*> chairParts;                 // 6 chairs, every piece is a Box
+static std::vector<Box*> lanternParts;               // lantern metal: chain, cap, posts, base
+static std::vector<Box*> glowParts;                  // lantern glass: drawn with emissive = 1
 
 // Room limits (same numbers as the contract): x,z in [-15, 15], floor y = -3, ceiling y = 9
 static const float ROOM = 15.0f;
@@ -202,6 +210,70 @@ void buildRoom()
     addZone(-3.3f,  3.3f, -3.0f, -1.0f, DIM_GOLD);  // opponent    (center 0, -2)
     addSlots(-2.0f, DIM_GOLD * 0.8f);
 
+    // 6b. Carpet, chairs and the two hanging lanterns (the "make the scene look real" pass).
+    //     The carpet is one flat quad on the floor, everything else is a Box: no new geometry code.
+    rugTexture = loadTextures({ "textures/rug.jpg" }, GL_CLAMP_TO_EDGE, GL_LINEAR);
+    if (rugTexture.empty())
+    {
+        std::cerr << "Room: rug texture failed to load" << std::endl;
+        return;
+    }
+    const float RUG_Y = FLOOR_Y + 0.005f;    // 5 mm above the floor, so the two never fight over depth
+    rugPart = new PolygonWithTexture(
+        { glm::vec3(-10.0f, RUG_Y,  6.5f), glm::vec3(10.0f, RUG_Y,  6.5f),
+          glm::vec3( 10.0f, RUG_Y, -6.5f), glm::vec3(-10.0f, RUG_Y, -6.5f) },
+        { glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec2(0.0f, 1.0f) });
+    rugPart->setTexture(rugTexture[0]);
+
+    // One chair = 8 boxes, always modelled facing +z (backrest on the -z side).
+    // To turn a chair we rotate its OFFSETS around the chair origin; the boxes themselves stay
+    // axis-aligned because we only use 0/90/180/270, so their width and depth simply swap.
+    auto addChair = [&](glm::vec3 origin, float rotY, int wood, int cloth)
+    {
+        const float c = glm::cos(glm::radians(rotY));
+        const float s = glm::sin(glm::radians(rotY));
+        auto place = [&](glm::vec3 offset, glm::vec3 size, int tex)
+        {
+            glm::vec3 center = origin + glm::vec3(offset.x * c + offset.z * s, offset.y,
+                                                  -offset.x * s + offset.z * c);
+            glm::vec3 worldSize(std::fabs(c) * size.x + std::fabs(s) * size.z, size.y,
+                                std::fabs(s) * size.x + std::fabs(c) * size.z);
+            chairParts.push_back(new Box(center, worldSize, tableTextures[tex]));
+        };
+        place(glm::vec3(-0.55f, 0.75f,  0.55f), glm::vec3(0.14f, 1.50f, 0.14f), wood);   // 4 legs
+        place(glm::vec3( 0.55f, 0.75f,  0.55f), glm::vec3(0.14f, 1.50f, 0.14f), wood);
+        place(glm::vec3(-0.55f, 0.75f, -0.55f), glm::vec3(0.14f, 1.50f, 0.14f), wood);
+        place(glm::vec3( 0.55f, 0.75f, -0.55f), glm::vec3(0.14f, 1.50f, 0.14f), wood);
+        place(glm::vec3(0.0f, 1.58f,  0.0f), glm::vec3(1.35f, 0.16f, 1.35f), wood);       // seat
+        place(glm::vec3(0.0f, 1.70f,  0.0f), glm::vec3(1.05f, 0.10f, 1.00f), cloth);      // cushion
+        place(glm::vec3(0.0f, 1.80f, -0.60f), glm::vec3(1.30f, 1.00f, 0.14f), wood);      // backrest
+        place(glm::vec3(0.0f, 2.36f, -0.60f), glm::vec3(1.45f, 0.14f, 0.18f), wood);      // top rail
+    };
+
+    // 6 chairs: two on each long side, one on each end. rotY turns every chair towards the table.
+    addChair(glm::vec3(-2.9f, FLOOR_Y,  5.7f), 180.0f, WOOD, FELT);   // near side, faces -z
+    addChair(glm::vec3( 2.9f, FLOOR_Y,  5.7f), 180.0f, WOOD, FELT);
+    addChair(glm::vec3(-2.9f, FLOOR_Y, -5.7f),   0.0f, WOOD, FELT);   // far side, faces +z
+    addChair(glm::vec3( 2.9f, FLOOR_Y, -5.7f),   0.0f, WOOD, FELT);
+    addChair(glm::vec3(-7.7f, FLOOR_Y,  0.0f),  90.0f, WOOD, FELT);   // left end, faces +x
+    addChair(glm::vec3( 7.7f, FLOOR_Y,  0.0f), -90.0f, WOOD, FELT);   // right end, faces -x
+
+    // Two lanterns hanging over the table. The glass box glows (emissive), and its position is
+    // exactly one of the two warm lights hard-coded in scene.fs, so the light really comes from it.
+    const glm::vec3 BRASS(0.55f, 0.45f, 0.30f);
+    for (float lx : { -4.0f, 4.0f })
+    {
+        lanternParts.push_back(new Box(glm::vec3(lx, 6.60f, 0.0f), glm::vec3(0.06f, 4.80f, 0.06f), zoneTexture[0], BRASS)); // chain
+        lanternParts.push_back(new Box(glm::vec3(lx, 4.15f, 0.0f), glm::vec3(0.86f, 0.18f, 0.86f), zoneTexture[0], BRASS)); // cap
+        for (int sx = -1; sx <= 1; sx += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+                lanternParts.push_back(new Box(glm::vec3(lx + sx * 0.30f, 3.60f, sz * 0.30f),
+                                              glm::vec3(0.09f, 1.00f, 0.09f), zoneTexture[0], BRASS));                    // 4 posts
+        lanternParts.push_back(new Box(glm::vec3(lx, 3.05f, 0.0f), glm::vec3(0.80f, 0.14f, 0.80f), zoneTexture[0], BRASS)); // base
+        glowParts.push_back(new Box(glm::vec3(lx, 3.60f, 0.0f), glm::vec3(0.60f, 0.90f, 0.60f), zoneTexture[0],
+                                    glm::vec3(1.0f, 0.80f, 0.48f)));                                                         // glass
+    }
+
     // 7. Poster on the back wall (z = -15). The picture is 1024 x 1536 (ratio 2:3), so 8 tall -> 5.333 wide.
     //    It floats 0.02 in front of the wall so the two surfaces don't fight over depth (same idea as the 0.005 on the table).
     posterTexture = loadTextures({ "textures/poster.png" }, GL_CLAMP_TO_EDGE, GL_LINEAR);
@@ -303,8 +375,16 @@ void drawRoom(Shader& shader)
     for (size_t i = 0; i + 1 < roomParts.size(); i++)
         roomParts[i]->draw(shader);
 
+    // The carpet, lying on the floor under the table
+    if (rugPart)
+        rugPart->draw(shader);
+
     // The table (top + 4 legs), drawn before the ceiling
     for (Box* part : tableParts)
+        part->draw(shader);
+
+    // The 6 chairs around the table
+    for (Box* part : chairParts)
         part->draw(shader);
 
     // The 3 zone frames, on top of the felt
@@ -331,6 +411,15 @@ void drawRoom(Shader& shader)
         posterShadow->draw(shader);
     if (posterPart)
         posterPart->draw(shader);
+
+    // The two lanterns: metal parts are lit normally, the glass is drawn with emissive = 1 (it glows),
+    // and emissive goes back to 0 right after, so the cards and the ceiling are lit as usual.
+    for (Box* part : lanternParts)
+        part->draw(shader);
+    shader.setFloat("emissive", 1.0f);
+    for (Box* part : glowParts)
+        part->draw(shader);
+    shader.setFloat("emissive", 0.0f);
 
     // Ceiling: culled when seen from above, so the top camera can see the table through it
     if (!roomParts.empty())
@@ -376,6 +465,31 @@ void destroyRoom()
     }
     glDeleteTextures(static_cast<GLsizei>(decorTextures.size()), decorTextures.data());
     glDeleteTextures(static_cast<GLsizei>(chestTexture.size()), chestTexture.data());
+    glDeleteTextures(static_cast<GLsizei>(rugTexture.size()), rugTexture.data());
+    if (rugPart)
+    {
+        rugPart->deleteBuffers();
+        delete rugPart;
+        rugPart = nullptr;
+    }
+    for (Box* part : chairParts)
+    {
+        part->destroy();
+        delete part;
+    }
+    chairParts.clear();
+    for (Box* part : lanternParts)
+    {
+        part->destroy();
+        delete part;
+    }
+    lanternParts.clear();
+    for (Box* part : glowParts)
+    {
+        part->destroy();
+        delete part;
+    }
+    glowParts.clear();
     delete decorModel;                       // Model owns its meshes; deleting it frees them
     decorModel = nullptr;
     if (posterShadow)
