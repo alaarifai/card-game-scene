@@ -41,4 +41,4 @@ private:
 	PolygonWithTexture();
 };
 
-#endif // POLYGON_H
+#endif 

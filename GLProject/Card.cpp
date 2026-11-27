@@ -106,3 +106,9 @@ void Card::lay()
 {
     targetAngle = 0.0f;
 }
+
+
+void Card::deleteBuffers()
+{
+    shape.deleteBuffers();
+}

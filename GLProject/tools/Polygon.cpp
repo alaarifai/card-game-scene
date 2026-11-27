@@ -15,13 +15,13 @@ Polygon::Polygon(std::vector<glm::vec3> v, glm::vec3 c) {
 	glBindVertexArray(VAO);
 	glGenBuffers(1, &VBO);
 
-	// position attribute
+	
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
 	glEnableVertexAttribArray(0);
 
-	// normal attribute
+	
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
@@ -43,7 +43,7 @@ void Polygon::draw(Shader& shader)
 
 void Polygon::deleteBuffers() {
 	glDeleteVertexArrays(1, &VAO);
-	//glDeleteBuffers(1, &VBO);
+	
 }
 
 Polygon::Polygon() {
@@ -70,14 +70,14 @@ PolygonWithTexture::PolygonWithTexture(std::vector<glm::vec3> v, std::vector<glm
 	glBindVertexArray(VAO);
 	glGenBuffers(1, &VBO);
 
-	// position attribute
+	
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
-	// texture attribute
+	
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(2); //2 is to work with the Model class
+	glEnableVertexAttribArray(2); 
 	this->VAO = VAO;
 }
 
@@ -100,6 +100,6 @@ void PolygonWithTexture::draw(Shader& shader)
 
 void PolygonWithTexture::deleteBuffers() {
 	glDeleteVertexArrays(1, &VAO);
-	//glDeleteBuffers(1, &VBO);
+	
 }
 

@@ -13,6 +13,7 @@ public:
     void draw(Shader &shader);
     void stand();
     void lay();
+    void deleteBuffers();
     void moveTo(glm::vec3 target);
 
     int id;

@@ -13,18 +13,18 @@ uniform bool blinn;
 
 void main()
 {
-    //color
+    
     vec3 color = texture(texture_diffuse1, texCoord).rgb * vec3(objectColor);
-    //ambient
+    
     vec3 ambient = 0.1 * color;
-    //diffuse
+    
     vec3 lightDir = normalize(lightPos - fragPos);
     vec3 dx = dFdx(fragPos);
     vec3 dy = dFdy(fragPos);
     vec3 normal = normalize(cross(dx, dy));
     float diff = max(dot(lightDir, normal), 0.0);
     vec3 diffuse = diff * color;
-    //specular
+    
     vec3 viewDir = normalize(viewPos - fragPos);
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = 0.0;
@@ -38,7 +38,7 @@ void main()
         vec3 reflectDir = reflect(-lightDir, normal);
         spec = pow(max(dot(viewDir, reflectDir), 0.0), 8.0);
     }
-    vec3 specular = vec3(0.5) * spec; // assuming bright white light color
+    vec3 specular = vec3(0.5) * spec; 
     
     FragColor = vec4(ambient + diffuse + specular, 1.0);
 }

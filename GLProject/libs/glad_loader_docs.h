@@ -2,7 +2,7 @@
 #define GLAD_DOCS_H
  #include <glad/glad.h>
 #endif
-// glad_docs.h
+
 #if defined(__clang__) || defined(__INTELLISENSE__)
 
 #ifdef glAccum
@@ -4398,7 +4398,7 @@
 #undef glGetFramebufferParameterivMESA
 #endif
 
-// Now redefine them as real prototypes
+
 #include "OpenGLFunctions.h"
 
-#endif // __clangd__
+#endif 

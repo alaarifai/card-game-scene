@@ -25,4 +25,4 @@ private:
 	std::vector<Polygon> faces;
 };
 
-#endif // CUBE_H
+#endif 
